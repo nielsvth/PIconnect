@@ -154,3 +154,15 @@ class TestPIPoint:
         """Test retrieving some interpolated data from the server."""
         data = pi_point.point.interpolated_values("01-07-2017", "02-07-2017", "1h")
         assert list(data.index) == pi_point.timestamps
+
+
+class TestPIPointList:
+    """TestPIPointList
+
+    Tests to verify functionality on multiple PIPoint objects at once
+    """
+
+    def test_search_returns_pipointlist(self):
+        with PI.PIServer() as server:
+            points = server.search("*")
+        assert isinstance(points, PI.PIPointList)
