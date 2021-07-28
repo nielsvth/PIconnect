@@ -46,6 +46,9 @@ jobs:
         run: |
           pytest
 
+      - name: Upload coverage to codecov
+        uses: codecov/codecov-action@v2
+
   check_format:
     runs-on: windows-latest
 

@@ -11,22 +11,20 @@ future = "*"
 piconnect = {editable = true,path = "."}
 
 [dev-packages]
+bandit = "*"
 black = "*"
 tox = "*"
-# coverage = "*"
-# mypy = "*"
+coverage = ">=6.0b1"
 codecov = "*"
 codacy-coverage = "*"
+"doc8" = "*"
+"flake8" = "*"
 pylint = "*"
 pytest = "*"
 pytest-runner = "*"
 pytest-cov = "*"
-Sphinx = "*"
 PyYAML = "*"
-"doc8" = "*"
-"flake8" = "*"
-twine = "*"
-coverage = ">=6.0b1"
+Sphinx = "*"
 
 [requires]
 python_version = "3.8"

@@ -148,7 +148,7 @@ except ImportError:
             """Mock class of the AF.PISystems class"""
 
             DefaultPISystem = None
-            Version = "0.0.0.0"
+            Version = "0.0.0.0"  # nosec # Skip Bandit test, is not an IP address
 
             def __init__(self):
                 self._init()
