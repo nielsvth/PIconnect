@@ -1,9 +1,9 @@
-from datetime import datetime
-
+from datetime import datetime, timedelta
+import numpy as np
 import pytz
 
-from PIconnect.AFSDK import AF
-from PIconnect.config import PIConfig
+from JanssenPI.AFSDK import AF
+from JanssenPI.config import PIConfig
 
 
 def to_af_time_range(start_time, end_time):
@@ -53,18 +53,33 @@ def timestamp_to_index(timestamp):
 
     Returns:
         `datetime`: Datetime with the timezone info from :data:`PIConfig.DEFAULT_TIMEZONE <PIconnect.config.PIConfigContainer.DEFAULT_TIMEZONE>`.
-    """
+    """ 
+    try: #issue of converting infite endtimes, now defaulted to timezone unaware infinite timezone
+        if datetime(timestamp.Year,
+                timestamp.Month,
+                timestamp.Day,
+                timestamp.Hour,
+                timestamp.Minute,
+                timestamp.Second,
+                timestamp.Millisecond * 1000)== datetime(9999, 12, 31, 23, 59, 59):
+            return np.nan
+    
+        else:
+            local_tz = pytz.timezone(PIConfig.DEFAULT_TIMEZONE)
+            return (
+                datetime(
+                    timestamp.Year,
+                    timestamp.Month,
+                    timestamp.Day,
+                    timestamp.Hour,
+                    timestamp.Minute,
+                    timestamp.Second,
+                    timestamp.Millisecond * 1000)
+                .replace(tzinfo=pytz.utc)
+                .astimezone(local_tz))
+    except:
+        return np.nan
+
+def add_timezone(timestamp):
     local_tz = pytz.timezone(PIConfig.DEFAULT_TIMEZONE)
-    return (
-        datetime(
-            timestamp.Year,
-            timestamp.Month,
-            timestamp.Day,
-            timestamp.Hour,
-            timestamp.Minute,
-            timestamp.Second,
-            timestamp.Millisecond * 1000,
-        )
-        .replace(tzinfo=pytz.utc)
-        .astimezone(local_tz)
-    )
+    return timestamp.replace(tzinfo=pytz.utc).astimezone(local_tz)

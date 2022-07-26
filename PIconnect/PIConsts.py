@@ -204,6 +204,49 @@ class EventFrameSearchMode(IntEnum):
     FORWARD_IN_PROGRESS = 6
     STARTING_AFTER_IN_PROGRESS = 6
 
+class SearchMode(IntEnum):
+    NONE = 0
+    START_INCLUSIVE = 1
+    END_INCLUSIVE = 2
+    INCLUSIVE = 3
+    OVERLAPPED = 4
+    IN_PROGRESS = 5
+
+class SortField(IntEnum):
+    ID = 0
+    NAME = 1
+    TYPE = 2
+    STARTTIME = 3
+    ENDTIME = 4
+
+class SortOrder(IntEnum):
+    ASCENDING = 0
+    DESCENDING = 1
+
+class BoundaryType(IntEnum):
+    INSIDE = 0
+    OUTSIDE = 1
+    INTERPOLATED = 2
+
+class SearchField (IntEnum):
+    NAME = 1
+    DESCRIPTION = 2
+    CATEGORIES = 4
+    TEMPLATE = 8
+    DEPARTMENT = 16
+    EMAIL = 32
+
+class PIPointType (IntEnum):
+    NULL = 0
+    INT16 = 6
+    INT32 = 8
+    FLOAT16 = 11
+    FLOAT32 = 12
+    FLOAT64 = 13
+    DIGITAL = 101
+    TIMESTAMP = 104
+    STRING = 105
+    BLOB = 102
 
 def get_enumerated_value(enumeration, value, default):
     if not value:
