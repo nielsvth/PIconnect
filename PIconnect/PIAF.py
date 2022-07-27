@@ -209,14 +209,54 @@ class PIAFDatabase(object):
         return EventList([Event(event) for event in lst])
 
     #find events by path, attribute, referenced element ---------------
+    
 
+    def all_assets(self, af_asset_list=[], depth=10):
+        '''return dataframe with hierarchical AF Asset structure'''
+        
+        #None of these https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFElement.htm FindElements methods works
+        #use AFDatabase.children to select starting element(s) of interest
+        #elements = self.database.Elements
+        
+        clist = List[AF.Asset.AFElement]() #create generic list
+        for af_asset in af_asset_list:
+            clist.Add(af_asset)
+        df_roots = pd.DataFrame([(Asset(y), y.GetPath()) for y in clist], columns=['Asset', 'Path'])
+        
+        if len(clist) > 0:
+            print('Fetching AF Asset element data')
+            #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_Asset_AFElement_LoadElementsToDepth.htm
+            asset_depth = AF.Asset.AFElement.LoadElementsToDepth(clist, False, depth, 1000000)
+        
+            if len(asset_depth) > 0:
+                df_assets = pd.DataFrame([(Asset(y), y.GetPath()) for y in asset_depth], columns=['Asset', 'Path'])
+            else:
+                df_assets = pd.DataFrame()
+            
+            print('lala')
+            print(type(df_assets['Asset'].iloc[0]))
+            print(df_assets['Asset'].iloc[0].name)
+            
+            #concatenate procedures and child event frames
+            df_assets = pd.concat([df_roots, df_assets], ignore_index=True)  
+
+            df_assets['Name'] = df_assets['Asset'].apply(lambda x: x.name if x else np.nan)
+            df_assets['Template'] = df_assets['Asset'].apply(lambda x: x.template_name if x else np.nan)
+            df_assets['Level'] = df_assets['Path'].str.count(r'\\').apply(lambda x: x-4)
+            #print('This Asset Frame has structure of "\\\\Server\\Database\\{}"'.format('\\'.join([str(el) for el in df_assets['Template'].unique()])))
+            return df_assets
+        else:
+            return pd.DataFrame(columns=['Asset', 'Path', 'Level', 'Name']) 
+    
+    
+    
 class Event:
     '''Container for Event object'''
         
     def __init__(self, event):
         self.eventframe = event
-        self.afcontainer = AF.AFNamedCollectionList[AF.EventFrame.AFEventFrame]() #empty container
-        self.afcontainer.Add(self.eventframe)
+        #self.afcontainer = AF.AFNamedCollectionList[AF.EventFrame.AFEventFrame]() #empty container
+        #self.afcontainer.Add(self.eventframe)
     
     def __repr__(self):
         return ('Event:' + self.eventframe.GetPath() )
@@ -442,7 +482,7 @@ class EventList(UserList):
             df_events['Starttime'] = df_events['Event'].apply(lambda x: x.starttime if x else np.nan)
             df_events['Endtime'] = df_events['Event'].apply(lambda x: x.endtime if x else np.nan)
 
-            print('This Event Hierarch has structure of "\\\\Server\\Database\\{}"'.format('\\'.join([str(ev) for ev in df_events['Template'].unique()])))
+            print('This Event Hierarch has structure of "\\\\Server\\Database\\{}"'.format('\\'.join([str(ev) for ev in df_events['Template'].unique()]))) #not completely correct if different templates on a single level
             return df_events
 
         else:
@@ -658,13 +698,6 @@ class CondensedHierarchy:
             dct[proc] = values
         return dct
     
-    
-    #def plot_discrete_extract(self, tag_list, nr_of_intervals, dataserver=None):
-        #'''Return nested dictionary (level 1: Procedures, Level 2: Tags) of discrete plot data extracts for events on bottom level of condensed hierarchy'''
-
-
-    
-    
     def plot_continuous_extract(self, tag_list, nr_of_intervals, dataserver=None):
         '''Return nested dictionary (level 1: Procedures, Level 2: Tags) of continuous plot data extracts from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy'''
         taglist = convert_to_TagList(tag_list, dataserver)
@@ -725,228 +758,73 @@ class CondensedHierarchy:
         df_sum.reset_index(drop = True, inplace=True)
         
         return df_sum
+        
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_EventFrame_AFEventFrame_FindEventFrames_1.htm
-    #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_AFSearchField.htm could be implemented
-    def procedures(self,
-        nameFilter=None,
-        start_time=None,
-        end_time='*',
-        start_index=0,
-        max_count=1000000,
-        search_mode=SearchMode.OVERLAPPED,
-        search_full_hierarchy=False,
-        sortField=SortField.STARTTIME,
-        sortOrder=SortOrder.ASCENDING):
-        '''Return a dictionary of form Procedure name: Procedure AF Event'''
-
-        if not start_time:
-            start_time = AF.Time.AFTime.Now
-        return {frame.Name: frame
-            for frame in AF.EventFrame.AFEventFrame.FindEventFrames(
-                self.database,
-                None,
-                search_mode,
-                start_time,
-                end_time,
-                nameFilter,
-                '*',
-                None,
-                None,
-                None,
-                None,
-                search_full_hierarchy,
-                sortField,
-                sortOrder,
-                start_index,
-                max_count)}
+class Asset:
+    '''Container for Event object'''
+        
+    def __init__(self, asset):
+        self.asset = asset
     
-    def procedures_from_list(self,
-                             batchlist=[], 
-                             start_time='*-10000d', 
-                             end_time='*',
-                             start_index=0,
-                             max_count=1000000,
-                             search_mode=SearchMode.OVERLAPPED,
-                             search_full_hierarchy=False,
-                             sortField=SortField.STARTTIME,
-                             sortOrder=SortOrder.ASCENDING):
-        fulldict = {}
-        for batch in batchlist:
-            subdict = self.procedures(nameFilter="*" + batch + "*", 
-                                      start_time=start_time, 
-                                      end_time=end_time,
-                                      start_index=start_index,
-                                      max_count=max_count,
-                                      search_mode=search_mode,
-                                      search_full_hierarchy=search_full_hierarchy,
-                                      sortField=sortField,
-                                      sortOrder=sortOrder)
-            if subdict:
-                fulldict = {**fulldict, **subdict}
-                print('Batch {} was added'.format(batch))
-            else:
-                print('Could not add batch {}'.format(batch))
-        return fulldict    
+    def __repr__(self):
+        return ('Asset:' + self.asset.GetPath() )
     
-    def event_frames(self,
-        nameFilter=None,
-        start_time=None,
-        end_time='*',
-        start_index=0,
-        max_count=1000000,
-        search_mode=SearchMode.OVERLAPPED,
-        search_full_hierarchy=False,
-        sortField=SortField.STARTTIME,
-        sortOrder=SortOrder.ASCENDING,
-        depth=10):
-        '''Return hierarchical Event Frames as a Pandas Dataframe'''
-        procedures = self.procedures(
-            nameFilter=nameFilter,
-            start_time=start_time,
-            end_time=end_time,
-            start_index=start_index,
-            max_count=max_count,
-            search_mode=search_mode,
-            search_full_hierarchy=search_full_hierarchy,
-            sortField=sortField,
-            sortOrder=sortOrder)
-        
-        #https://stackoverflow.com/questions/30586954/using-system-collections-generic-list1system-byte-in-python
-        clist = List[AF.EventFrame.AFEventFrame]() #create generic list
-        for procedure, AFprocedure in procedures.items():
-            print(procedure)
-            clist.Add(AFprocedure)
-        df_procedures = pd.DataFrame([(y, y.GetPath()) for y in clist], columns=['AFEvent', 'Path'])
-        
-        if len(clist) > 0:
-            print('Fetching event data for {} procedure(s)...'.format(len(clist)))
-            #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_EventFrame_AFEventFrame_LoadEventFramesToDepth.htm
-            event_depth = AF.EventFrame.AFEventFrame.LoadEventFramesToDepth(clist, False, depth, 1000000)
-
-            if len(event_depth) > 0:
-                df_events = pd.DataFrame([(y, y.GetPath()) for y in event_depth], columns=['AFEvent', 'Path'])
-            else:
-                df_events = pd.DataFrame()
-            
-            #concatenate procedures and child event frames
-            df_events = pd.concat([df_procedures, df_events], ignore_index=True)    
-                
-            df_events['Name'] = df_events['AFEvent'].apply(lambda x: x.Name if x else np.nan)
-            df_events['Template'] = df_events['AFEvent'].apply(lambda x: x.Template.Name if x.Template else np.nan)
-            df_events['Level'] = df_events['Path'].str.count(r'\\').apply(lambda x: x-4)
-            df_events['Starttime'] = df_events['AFEvent'].apply(lambda x: timestamp_to_index(x.StartTime.UtcTime) if x else np.nan)
-            df_events['Endtime'] = df_events['AFEvent'].apply(lambda x: timestamp_to_index(x.EndTime.UtcTime) if x else np.nan)        
-            df_events['AFTimerange'] = df_events['AFEvent'].apply(lambda x: x.TimeRange if x else np.nan)
-            print('This Event Frame has structure of "\\\\Server\\Database\\{}"'.format('\\'.join([str(ev) for ev in df_events['Template'].unique()])))
-            return df_events
+    def __str__(self):
+        return ('Asset:' + self.asset.GetPath() )
+    
+    #Properties
+    @property
+    def name(self):
+        '''Return name of event'''
+        return self.asset.Name
+    @property
+    def path(self):
+        '''Return path'''
+        return self.asset.GetPath() 
+    @property
+    def pisystem_name(self):
+        '''Return PISystem name'''
+        return self.asset.PISystem.Name
+    @property
+    def database_name(self):
+        '''Return database name'''
+        return self.asset.Database.Name
+    @property
+    def database(self):
+        '''Return PIAFDatabase object'''
+        return PIAFDatabase(server=self.pisystem_name, database=self.database_name)
+    @property
+    def af_asset(self):
+        '''Return AFEventFrame object'''
+        return self.asset
+    @property
+    def af_template(self):
+        '''Return AFTemplate'''
+        return self.asset.Template
+    @property
+    def template_name(self):
+        '''Return template name'''
+        if self.asset.Template:
+            return self.asset.Template.Name  
         else:
-            return pd.DataFrame(columns=['AFEvent', 'Path', 'Name', 'Level', 'Template', 'Starttime', 'Endtime', 'AFTimerange']) 
-   
+            return None
+    @property
+    def attributes(self):
+        ''''Return list of attribute names for event'''
+        return [attribute.Name for attribute in self.asset.Attributes]
+    @property
+    def af_attributes(self):
+        ''''Return list of AFAttributes for event'''
+        return [attribute for attribute in self.asset.Attributes]  
+    def children(self):
+        '''Return EventList of children for event'''
+        return list([Asset(asset) for asset in self.asset.children])
+    @property
+    def parent(self):
+        '''Return parent event for event'''
+        return Asset(self.asset.Parent)
+    @property
+    def description(self):
+        '''Return description for event'''
+        return self.asset.Description
 
-    def event_frames_from_list(self,
-        nameFilter=None,
-        start_time=None,
-        end_time='*',
-        start_index=0,
-        max_count=1000000,
-        search_mode=SearchMode.OVERLAPPED,
-        search_full_hierarchy=False,
-        sortField=SortField.STARTTIME,
-        sortOrder=SortOrder.ASCENDING,
-        depth=10):
-        '''Return hierarchical Event Frames as a Pandas Dataframe'''
-        procedures = self.procedures(
-            nameFilter=nameFilter,
-            start_time=start_time,
-            end_time=end_time,
-            start_index=start_index,
-            max_count=max_count,
-            search_mode=search_mode,
-            search_full_hierarchy=search_full_hierarchy,
-            sortField=sortField,
-            sortOrder=sortOrder)
-        
-        #https://stackoverflow.com/questions/30586954/using-system-collections-generic-list1system-byte-in-python
-        clist = List[AF.EventFrame.AFEventFrame]() #create generic list
-        for procedure, AFprocedure in procedures.items():
-            print(procedure)
-            clist.Add(AFprocedure)
-        df_procedures = pd.DataFrame([(y, y.GetPath()) for y in clist], columns=['AFEvent', 'Path'])
-        
-        if len(clist) > 0:
-            print('Fetching event data for {} procedure(s)...'.format(len(clist)))
-            #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_EventFrame_AFEventFrame_LoadEventFramesToDepth.htm
-            event_depth = AF.EventFrame.AFEventFrame.LoadEventFramesToDepth(clist, False, depth, 1000000)
-
-            if len(event_depth) > 0:
-                df_events = pd.DataFrame([(y, y.GetPath()) for y in event_depth], columns=['AFEvent', 'Path'])
-            else:
-                df_events = pd.DataFrame()
-            
-            #concatenate procedures and child event frames
-            df_events = pd.concat([df_procedures, df_events], ignore_index=True)    
-                
-            df_events['Name'] = df_events['AFEvent'].apply(lambda x: x.Name if x else np.nan)
-            df_events['Template'] = df_events['AFEvent'].apply(lambda x: x.Template.Name if x.Template else np.nan)
-            df_events['Level'] = df_events['Path'].str.count(r'\\').apply(lambda x: x-4)
-            df_events['Starttime'] = df_events['AFEvent'].apply(lambda x: timestamp_to_index(x.StartTime.UtcTime) if x else np.nan)
-            df_events['Endtime'] = df_events['AFEvent'].apply(lambda x: timestamp_to_index(x.EndTime.UtcTime) if x else np.nan)        
-            df_events['AFTimerange'] = df_events['AFEvent'].apply(lambda x: x.TimeRange if x else np.nan)
-            print('This Event Frame has structure of "\\\\Server\\Database\\{}"'.format('\\'.join([str(ev) for ev in df_events['Template'].unique()])))
-            return df_events
-        else:
-            return pd.DataFrame(columns=['AFEvent', 'Path', 'Name', 'Level', 'Template', 'Starttime', 'Endtime', 'AFTimerange']) 
-
-
-    def all_elements(self, af_element_list=[], depth=10):
-        '''return hierarchical AF Asset structure'''
-        
-        #None of these https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFElement.htm FindElements methods works
-        #use AFDatabase.children to select starting element(s) of interest
-        #elements = self.database.Elements
-        
-        clist = List[AF.Asset.AFElement]() #create generic list
-        for af_element in af_element_list:
-            clist.Add(af_element)
-        df_roots = pd.DataFrame([(y, y.GetPath()) for y in clist], columns=['AFElement', 'Path'])
-        
-        if len(clist) > 0:
-            print('Fetching AF Asset element data')
-            #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_Asset_AFElement_LoadElementsToDepth.htm
-            element_depth = AF.Asset.AFElement.LoadElementsToDepth(clist, False, depth, 1000000)
-        
-            if len(element_depth) > 0:
-                    df_elements = pd.DataFrame([(y, y.GetPath()) for y in element_depth], columns=['AFElement', 'Path'])
-            else:
-                df_elements = pd.DataFrame()
-
-            #concatenate procedures and child event frames
-            df_elements = pd.concat([df_roots, df_elements], ignore_index=True)  
-
-            df_elements['Name'] = df_elements['AFElement'].apply(lambda x: x.Name if x else np.nan)
-            df_elements['Template'] = df_elements['AFElement'].apply(lambda x: x.Template.Name if x.Template else np.nan)
-            df_elements['Level'] = df_elements['Path'].str.count(r'\\').apply(lambda x: x-4)
-            print('This Asset Frame has structure of "\\\\Server\\Database\\{}"'.format('\\'.join([str(el) for el in df_elements['Template'].unique()])))
-            return df_elements
-        else:
-            return pd.DataFrame(columns=['AFElement', 'Path', 'Level', 'Name']) 
-
-
-#def attributes(eventframe):
-    #return [attribute.Name for attribute in eventframe.Attributes]
