@@ -6,7 +6,6 @@ from JanssenPI.AFSDK import AF, AF_SDK_VERSION
 from JanssenPI.config import PIConfig
 from JanssenPI.PI import PIServer
 from JanssenPI.PIAF import PIAFDatabase
-import JanssenPI.EFMethods
 
 # pragma pylint: enable=unused-import
 

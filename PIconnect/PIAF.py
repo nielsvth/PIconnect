@@ -44,7 +44,7 @@ from warnings import warn
 
 from JanssenPI._utils import classproperty
 from JanssenPI.AFSDK import AF
-from JanssenPI.PIConsts import EventFrameSearchMode, SearchMode, SortField, SortOrder, SummaryType, CalculationBasis, TimestampCalculation, BoundaryType
+from JanssenPI.PIConsts import EventFrameSearchMode, SearchMode, SortField, SortOrder, SummaryType, CalculationBasis, TimestampCalculation, BoundaryType, ExpressionSampleType
 from JanssenPI.time import timestamp_to_index, add_timezone
 from JanssenPI.config import PIConfig
 from JanssenPI.PI import Tag, generate_pipointlist, convert_to_TagList
@@ -170,6 +170,7 @@ class PIAFDatabase(object):
     
     #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_EventFrame_AFEventFrame_FindEventFrames_1.htm
     #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_AFSearchField.htm could be implemented    
+    #https://pisquare.osisoft.com/s/Blog-Detail/a8r1I000000GvThQAK/using-the-afeventframesearch-class #> attributequery
     
     #add option to input list like PIpoint search -------------------------
     
@@ -218,6 +219,9 @@ class PIAFDatabase(object):
         #use AFDatabase.children to select starting element(s) of interest
         #elements = self.database.Elements
         
+        if af_asset_list == []:
+            af_asset_list = self.children.values()
+        
         clist = List[AF.Asset.AFElement]() #create generic list
         for af_asset in af_asset_list:
             clist.Add(af_asset)
@@ -233,10 +237,6 @@ class PIAFDatabase(object):
             else:
                 df_assets = pd.DataFrame()
             
-            print('lala')
-            print(type(df_assets['Asset'].iloc[0]))
-            print(df_assets['Asset'].iloc[0].name)
-            
             #concatenate procedures and child event frames
             df_assets = pd.concat([df_roots, df_assets], ignore_index=True)  
 
@@ -246,7 +246,7 @@ class PIAFDatabase(object):
             #print('This Asset Frame has structure of "\\\\Server\\Database\\{}"'.format('\\'.join([str(el) for el in df_assets['Template'].unique()])))
             return df_assets
         else:
-            return pd.DataFrame(columns=['Asset', 'Path', 'Level', 'Name']) 
+            return pd.DataFrame(columns=['Asset', 'Path', 'Name', 'Template', 'Level']) 
     
     
     
@@ -387,9 +387,23 @@ class Event:
         return taglist.summary(self.starttime, self.endtime, summary_types, calculation_basis, time_type)
     
     #summaries
-    
+    def summaries(self, tag_list, interval, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO):
+        '''Return one or more summary values for Tags in Taglist, for each interval within the specified event duration'''
+        taglist = convert_to_TagList(tag_list, dataserver)
+        return taglist.summaries(self.starttime, self.endtime, interval, summary_types, calculation_basis, time_type)
+        
     #filtered summaries
-    
+    def filtered_summaries(self, tag_list, interval,summary_types,
+                           filter_expression,
+                           dataserver=None,
+                           calculation_basis=CalculationBasis.TIME_WEIGHTED, 
+                           time_type=TimestampCalculation.AUTO, 
+                           AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, 
+                           filter_interval=None):
+        '''Return one or more summary values for Tags in Taglist, (Optional: for each interval) within event duration'''
+        taglist = convert_to_TagList(tag_list, dataserver)
+        return taglist.filtered_summaries(self.starttime, self.endtime, interval,summary_types, filter_expression,
+                                          calculation_basis, time_type, AFfilter_evaluation, filter_interval)
     
     def get_attribute_values(self, attribute_names_list=[]):
         '''Return dict of attribute values for specified attributes'''
@@ -404,7 +418,7 @@ class Event:
                     attribute_dct[attribute.Name] = attribute.GetValue().Value
             return attribute_dct
     
-    def get_event_hierarchy(self, depth=10): ##### lookup by template instead of number?-------------------
+    def get_event_hierarchy(self, depth=10): ##### lookup by template instead of number? - Level more constant then templates?
         '''Return dataframe of event Hierarchy'''
         df_procedures = pd.DataFrame([(self.eventframe, self.eventframe.GetPath())], columns=['Event', 'Path'])
 
@@ -427,7 +441,7 @@ class Event:
         df_events['Starttime'] = df_events['Event'].apply(lambda x: x.starttime if x else np.nan)
         df_events['Endtime'] = df_events['Event'].apply(lambda x: x.endtime if x else np.nan)        
 
-        print('This Event Hierarchy has structure of "\\\\Server\\Database\\{}"'.format('\\'.join([str(ev) for ev in df_events['Template'].unique()])))
+        print('This Event Hierarchy has structure of "\\\\Server\\Database\\{}"'.format('\\'.join([str(ev) for ev in df_events['Template'].unique()]))) #not really correct when different templates on a level
         return df_events
 
 
@@ -486,11 +500,17 @@ class EventList(UserList):
             return df_events
 
         else:
-            return pd.DataFrame(columns=['Event', 'Path', 'Name', 'Level', 'Template', 'Starttime', 'Endtime', 'AFTimerange']) 
+            return pd.DataFrame(columns=['Event', 'Path', 'Name', 'Level', 'Template', 'Starttime', 'Endtime']) 
+
+try:
+    #delete the accessor to avoid warning 
+    del pd.DataFrame.ehy
+except AttributeError:
+    pass
 
 #https://pandas.pydata.org/docs/development/extending.html
 #DataFrames are not meant to be subclassed, but you can implement your own functionality via the extension API.
-@pd.api.extensions.register_dataframe_accessor("hy")
+@pd.api.extensions.register_dataframe_accessor("ehy")
 class EventHierarchy:
     '''Additional functionality for pd.DataFrame object, for working with EventHierarchies'''
     
@@ -576,8 +596,13 @@ class EventHierarchy:
                 df_condensed[col].fillna(df_condensed[endtime_cols[i-1]], inplace=True)
         return df_condensed
 
+try:
+    #delete the accessor to avoid warning 
+    del pd.DataFrame.ecd
+except AttributeError:
+    pass
         
-@pd.api.extensions.register_dataframe_accessor("cd")    
+@pd.api.extensions.register_dataframe_accessor("ecd")    
 class CondensedHierarchy:
     '''Additional functionality for pd.DataFrame object, for working with CondensedHierarchies'''
     
@@ -827,4 +852,84 @@ class Asset:
     def description(self):
         '''Return description for event'''
         return self.asset.Description
+    
+    #methods
+    def get_attribute_values(self, attribute_names_list=[]):
+        '''Return dict of attribute values for specified attributes'''
+        attribute_dct={}
+        if not attribute_names_list:
+            for attribute in self.eventframe.Attributes:
+                attribute_dct[attribute.Name] = attribute.GetValue().Value
+            return attribute_dct
+        else:
+            for attribute in self.eventframe.Attributes:
+                if attribute.Name in attribute_names_list:
+                    attribute_dct[attribute.Name] = attribute.GetValue().Value
+            return attribute_dct
 
+try:
+    #delete the accessor to avoid warning 
+    del pd.DataFrame.ahy
+except AttributeError:
+    pass
+
+@pd.api.extensions.register_dataframe_accessor("ahy")
+class AssetHierarchy:
+    '''Additional functionality for pd.DataFrame object, for working with EventHierarchies'''
+    
+    def __init__(self, df):
+        self.validate(df)
+        self.df = df
+    
+    @staticmethod
+    def validate(df):
+        '''Validate object meets requirements for EventHierarchy'''
+        #verify that dataframe fits EventHierarchy requirements
+        if not {'Asset', 'Path', 'Name', 'Template', 'Level'}.issubset(set(df.columns)):
+            raise AttributeError("This dataframe does not have the correct AssetHierarchy format")
+    
+    #methods
+    def add_attributes(self, attribute_names_list, level):
+        ''''Add attributtes to AssetHierarchy for specified attributes and template/level'''
+        print('Fetching attribute(s)...')
+
+        for attribute in attribute_names_list:
+            self.df[attribute+' ['+str(level)+']'] = self.df.loc[self.df['Level']==level, 'Event'].apply(lambda x: x.get_attribute_values([attribute])[attribute]) 
+        
+        for colname in self.df.columns:
+            try:
+                self.df[colname] = self.df[colname].astype(float)
+            except:
+                pass
+        return self.df
+            
+    
+    def condense(self, level=10):
+        ''''Return condensed dataframe for Asset hierarchy, up to specified template/level'''
+        print('Condensing...')
+        if type(level) == str:
+            level = self.df.loc[self.df['Template']==level, 'Level'].iloc[0]
+        
+        self.df = self.df[self.df['Level']<=level].copy()
+        #merge level by level
+        i=0
+        for level, df_level in self.df.groupby('Level'):
+            #add auxiliary columns for merge based on path
+            cols = [x for x in range(int(level)+1)]
+            df_level[cols] = df_level['Path'].str.split('\\', expand=True).loc[:, 4:]
+            #remove Path columns
+            df_level.drop(['Path'], 1, inplace=True)
+            #rename columns, ignore columns with number names
+            df_level.columns = [col_name + ' [' + str(level) + ']' if not ((type(col_name) == int) or ('[' in col_name)) else col_name for col_name in df_level.columns]
+            #merge with previous level
+            if i == 0:
+                df_condensed = df_level
+                i+=1
+            else:
+                df_condensed = pd.merge(df_condensed, df_level, how='right', left_on=cols[:-1], right_on=cols[:-1])
+        #drop auxiliary columns 
+        df_condensed.drop([col_name for col_name in df_condensed.columns if type(col_name) == int], 1, inplace=True)
+        #remove duplicates
+        df_condensed = df_condensed.drop_duplicates(keep='first')
+        
+        return df_condensed

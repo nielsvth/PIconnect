@@ -37,7 +37,6 @@ from JanssenPI._utils import classproperty
 from JanssenPI.AFSDK import AF
 from JanssenPI.PIConsts import AuthenticationMode, BoundaryType, SummaryType, CalculationBasis, TimestampCalculation, PIPointType, ExpressionSampleType
 from JanssenPI.time import timestamp_to_index, to_af_time_range, add_timezone
-from JanssenPI.EFMethods import view 
 
 from collections import UserList
 
@@ -186,6 +185,22 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
              raise TypeError('Argument query must be either a string or a list of strings,' +
                              'got type ' + str(type(query)))
         return TagList([Tag(pi_point)for pi_point in AF.PI.PIPoint.FindPIPoints(self.connection, BuiltinStr(query), source, None)])
+        
+    def get_tags(self, query):
+        """Returns dataframe containing Tag object, tag name, description and UOM for each tag that meets the restrictions specified in the query"""
+        tags = self.search(str(query))
+        
+        df = pd.DataFrame()
+        df['Tag'] = [tag for tag in tags]
+        #load attributes before GET
+        #df['Tag'].apply(lambda x: x.LoadAttributes(['descriptor', 'engunits']))
+        df['Name'] = df['Tag'].apply(lambda x: x.name)
+        df['Description'] = df['Tag'].apply(lambda x: x.description)
+        df['UOM'] = df['Tag'].apply(lambda x: x.units_of_measurement)
+        #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_PI_PIPointType.htm
+        df['PointType'] = df['Tag'].apply(lambda x: x.pointtype)
+        df['PointType_desc'] = df['Tag'].apply(lambda x: x.pointtype_desc)
+        return df
 
     
 class Tag:
@@ -250,6 +265,14 @@ class Tag:
     def created(self):
         """Return the creation datetime of a point."""
         return timestamp_to_index(self.raw_attributes["creationdate"])
+    
+    @property
+    def pointtype(self):
+        return self.tag.PointType
+    
+    @property
+    def pointtype_desc(self):
+        return str(PIPointType(self.pointtype))
 
     #Methods
     def current_value(self):
@@ -619,523 +642,8 @@ class TagList(UserList):
         else:
             return pd.DataFrame()
 
-
-
-
-
-
-
-
-
-
-
-
-    
-        
-    def get_interpolated_values_AFTimerange(self, tag, AFTimeRange, interval):
-        ''''Return interpolated values for tag specified by its tagname or PIPoint, for AFTimerange'''
-        if type(tag) == AF.PI.PIPoint:
-            pass
-        elif type(tag) == str:
-            try:
-                tag = self.search(tag)[0]
-            except:
-                raise Exception('Tag "' + tag + '" was not found') 
-        elif type(tag) == list:
-            raise Exception("Tag can not be a list, in case of list of tags use <server.get_interpolated_values_multiple()>")
-                
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Time_AFTimeSpan.htm
-        AFInterval = AF.Time.AFTimeSpan.Parse(interval)
-        
-        pivalues = tag.InterpolatedValues(AFTimeRange, AFInterval, '', False)
-        timestamps = []
-        values = []
-        for value in pivalues:
-            timestamps.append(timestamp_to_index(value.Timestamp.UtcTime))
-            values.append(value.Value)
-        return pd.Series(index = timestamps, data = values).to_frame() 
-
-
-    def get_interpolated_values(self, tag, starttime, endtime, interval):
-        ''''Return Series of interpolated values for tag specified by its tagname or PIPoint, between starttime and endtime'''
-        if type(tag) == AF.PI.PIPoint:
-            pass
-        elif type(tag) == str:
-            try:
-                tag = self.search(tag)[0]
-            except:
-                raise Exception('Tag "' + tag + '" was not found')  
-        elif type(tag) == list:
-            raise Exception("Tag can not be a list, in case of list of tags use <server.get_interpolated_values_multiple()>")
-                
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Time_AFTimeSpan.htm
-        AFInterval = AF.Time.AFTimeSpan.Parse(interval)
-        AFTimeRange = to_af_time_range(starttime, endtime)
-        pivalues = tag.InterpolatedValues(AFTimeRange, AFInterval, '', False)
-        timestamps = []
-        values = []
-        for value in pivalues:
-            timestamps.append(timestamp_to_index(value.Timestamp.UtcTime))
-            values.append(value.Value)
-        return pd.Series(index = timestamps, data = values).to_frame() 
-
-
-    def get_summary(self, tag, starttime, endtime, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO):
-        if type(tag) == AF.PI.PIPoint:
-            pass
-        elif type(tag) == str:
-            try:
-                tag = self.search(tag)[0]
-            except:
-                raise Exception('Tag "' + tag + '" was not found')  
-        elif type(tag) == list:
-            raise Exception("Tag can not be a list, in case of list of tags use <server.get_interpolated_values_multiple()>")
-        AFTimeRange = to_af_time_range(starttime, endtime)
-        result = tag.Summary(AFTimeRange, summary_types, calculation_basis, time_type)    
-        df = pd.DataFrame([[x.Value.Value, timestamp_to_index(x.Value.Timestamp.UtcTime)] for x in result],
-                            index = [SummaryType(x.Key).name for x in result], columns = ['Value', 'Timestamp'])
-        return df
-
-
-    def get_summary_multiple(self, tag_list, starttime, endtime, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO):
-        if type(tag_list) == str:
-            raise Exception ("Tag needs to be a inside a list")
-        PIPointlist = AF.PI.PIPointList()
-        for tag in tag_list:
-            if type(tag) == AF.PI.PIPoint:
-                pass
-            elif type(tag) == str:
-                try:
-                    tag = self.search(tag)[0]
-                except:
-                    print('Tag "' + tag + '" was not found')
-                    continue
-            PIPointlist.Add(tag)
-        AFTimeRange = to_af_time_range(starttime, endtime)
-
-        result = PIPointlist.Summary(AFTimeRange, summary_types, calculation_basis, time_type, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))    
-        #to avoid queue emptying
-        data = list(result)
-        
-        df_final = pd.DataFrame()
-        for x in data:
-            points = [y.PIPoint.Name for y in x.Values][0]
-            summaries = [SummaryType(y).name for y in x.Keys]
-            values = [[y.Value, timestamp_to_index(y.Timestamp.UtcTime)] for y in x.Values]
-            df = pd.DataFrame(values, columns = ['Value', 'Timestamp'])
-            df['Tag'] = points
-            df['Summary'] = summaries
-            df_final = df_final.append(df, ignore_index=True)
-            
-        df_final = df_final[['Tag', 'Summary','Value', 'Timestamp']]
-        return df_final
-
-
-    def get_interpolated_values_multiple_AFTimerange(self, tag_list, AFTimeRange, interval):
-        ''''Return Dataframe of interpolated values for tags specified by list of tagnames or PIPoint, for AFTimerange'''
-        if type(tag_list) == str:
-            raise Exception ("Tag needs to be a inside a list")
-        PIPointlist = AF.PI.PIPointList()
-        for tag in tag_list:
-            if type(tag) == AF.PI.PIPoint:
-                pass
-            elif type(tag) == str:
-                try:
-                    tag = self.search(tag)[0]
-                except:
-                    print('Tag "' + tag + '" was not found')
-                    continue
-            PIPointlist.Add(tag)
-        AFInterval = AF.Time.AFTimeSpan.Parse(interval)
-        
-        #Could have issues with quering multiple PI Data Archives simultanously, see documentation
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_InterpolatedValues.htm
-        result = PIPointlist.InterpolatedValues(AFTimeRange, AFInterval, '', False, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))
-
-        #process query results
-        data = list(result.ResultQueue.GetConsumingEnumerable())
-        data = [list(reeks)for reeks in data]
-        df = pd.DataFrame(data).T
-        df.columns = [tag.Name for tag in result.PointList]
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
-        df.index = df[df.columns[0]].apply(lambda x: timestamp_to_index(x.Timestamp.UtcTime))
-        df.index.name = 'Index'
-        df = df.applymap(lambda x: x.Value)
-        return df
-                
-
-    def get_interpolated_values_multiple(self, tag_list, starttime, endtime, interval):
-        ''''Return Dataframe of interpolated values for tags specified by list of tagnames or PIPoint, between starttime and endtime'''
-        if type(tag_list) == str:
-            raise Exception ("Tag needs to be a inside a list")
-        PIPointlist = AF.PI.PIPointList()
-        for tag in tag_list:
-            if type(tag) == AF.PI.PIPoint:
-                pass
-            elif type(tag) == str:
-                try:
-                    tag = self.search(tag)[0]
-                except:
-                    print('Tag "' + tag + '" was not found')
-                    continue
-            PIPointlist.Add(tag)
-        AFInterval = AF.Time.AFTimeSpan.Parse(interval)
-        AFTimeRange = to_af_time_range(starttime, endtime)
-        
-        #Could have issues with quering multiple PI Data Archives simultanously, see documentation
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_InterpolatedValues.htm
-        result = PIPointlist.InterpolatedValues(AFTimeRange, AFInterval, '', False, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))
-
-        #process query results
-        data = list(result.ResultQueue.GetConsumingEnumerable())
-        data = [list(reeks)for reeks in data]
-        df = pd.DataFrame(data).T
-        df.columns = [tag.Name for tag in result.PointList]
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
-        df.index = df[df.columns[0]].apply(lambda x: timestamp_to_index(x.Timestamp.UtcTime))
-        df.index.name = 'Index'
-        df = df.applymap(lambda x: x.Value)
-        return df
-
-
-    def get_recorded_values_AFTimerange(self, tag, AFTimeRange):
-        ''''Return interpolated values for tag specified by its tagname or PIPoint, for AFTimerange'''
-        if type(tag) == AF.PI.PIPoint:
-            pass
-        elif type(tag) == str:
-            try:
-                tag = self.search(tag)[0]
-            except:
-                raise Exception('Tag "' + tag + '" was not found') 
-        elif type(tag) == list:
-            raise Exception("Tag can not be a list, in case of list of tags use <server.get_interpolated_values_multiple()>")
-        AFBoundaryType = BoundaryType.INSIDE
-        pivalues = tag.RecordedValues(AFTimeRange, AFBoundaryType, '', False)
-        timestamps = []
-        values = []
-        for value in pivalues:
-            timestamps.append(timestamp_to_index(value.Timestamp.UtcTime))
-            values.append(value.Value)
-        return pd.Series(index = timestamps, data = values).to_frame() 
-
-
-    def get_recorded_values(self, tag, starttime, endtime):
-        ''''Return Series of interpolated values for tag specified by its tagname or PIPoint, between starttime and endtime'''
-        if type(tag) == AF.PI.PIPoint:
-            pass
-        elif type(tag) == str:
-            try:
-                tag = self.search(tag)[0]
-            except:
-                raise Exception('Tag "' + tag + '" was not found')  
-        elif type(tag) == list:
-            raise Exception("Tag can not be a list, in case of list of tags use <server.get_interpolated_values_multiple()>")
-                
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Time_AFTimeSpan.htm
-        AFTimeRange = to_af_time_range(starttime, endtime)
-        AFBoundaryType = BoundaryType.INSIDE
-        pivalues = tag.RecordedValues(AFTimeRange, AFBoundaryType, '', False)
-        timestamps = []
-        values = []
-        for value in pivalues:
-            timestamps.append(timestamp_to_index(value.Timestamp.UtcTime))
-            values.append(value.Value)
-        return pd.Series(index = timestamps, data = values).to_frame() 
-
-
-    def get_recorded_values_multiple_AFTimerange(self, tag_list, AFTimeRange):
-        ''''Return Dataframe of interpolated values for tags specified by list of tagnames or PIPoint, for AFTimerange'''
-        if type(tag) == str:
-            raise Exception ("Tag needs to be a inside a list")
-        PIPointlist = AF.PI.PIPointList()
-        for tag in tag_list:
-            if type(tag) == AF.PI.PIPoint:
-                pass
-            elif type(tag) == str:
-                try:
-                    tag = self.search(tag)[0]
-                except:
-                    print('Tag "' + tag + '" was not found')
-                    continue
-            PIPointlist.Add(tag)
-        AFBoundaryType = BoundaryType.INSIDE
-        #Could have issues with quering multiple PI Data Archives simultanously, see documentation
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_InterpolatedValues.htm
-        result = PIPointlist.RecordedValues(AFTimeRange, AFBoundaryType, '', False, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))
-
-        #process query results
-        data = list(result.ResultQueue.GetConsumingEnumerable())
-        data = [list(reeks)for reeks in data]
-        
-        dct = {}
-        tags = [tag.Name for tag in result.PointList]
-        for i, lst in enumerate(data):
-            df = pd.DataFrame([lst]).T
-            df.columns = ['Data']
-            #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
-            df.index = df['Data'].apply(lambda x: timestamp_to_index(x.Timestamp.UtcTime))
-            df.index.name = 'Index'
-            df = df.applymap(lambda x: x.Value)
-            dct[tags[i]] = df
-        return dct
-                
-
-    def get_recorded_values_multiple(self, tag_list, starttime, endtime):
-        ''''Return Dataframe of interpolated values for tags specified by list of tagnames or PIPoint, between starttime and endtime'''
-        PIPointlist = AF.PI.PIPointList()
-        for tag in tag_list:
-            if type(tag) == AF.PI.PIPoint:
-                pass
-            elif type(tag) == str:
-                try:
-                    tag = self.search(tag)[0]
-                except:
-                    print('Tag "' + tag + '" was not found')
-                    continue
-            PIPointlist.Add(tag)
-        AFTimeRange = to_af_time_range(starttime, endtime)
-        AFBoundaryType = BoundaryType.INSIDE
-        #Could have issues with quering multiple PI Data Archives simultanously, see documentation
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_InterpolatedValues.htm
-        result = PIPointlist.RecordedValues(AFTimeRange, AFBoundaryType, '', False, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))
-
-        #process query results
-        data = list(result.ResultQueue.GetConsumingEnumerable())
-        data = [list(reeks)for reeks in data]
-
-        dct = {}
-        tags = [tag.Name for tag in result.PointList]
-        for i, lst in enumerate(data):
-            df = pd.DataFrame([lst]).T
-            df.columns = ['Data']
-            #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
-            df.index = df['Data'].apply(lambda x: timestamp_to_index(x.Timestamp.UtcTime))
-            df.index.name = 'Index'
-            df = df.applymap(lambda x: x.Value)
-            dct[tags[i]] = df
-        return dct
-       
-    def to_MVA(self, event_dataframe, tag_list, interval, level=None):
-        if 'Name' in event_dataframe.columns: #flat dataframe
-            if level:
-                #translate template to correspondinglevel if applicable
-                if type(level) == str:
-                    level = event_dataframe.loc[event_dataframe['Template']==level, 'Level'].iloc[0]
-                print('building MVA table from flat eventframe dataframe...')
-                
-                if str(type(event_dataframe['AFTimerange'].iloc[0])) != "<class 'OSIsoft.AF.Time.AFTimeRange'>":
-                    raise Exception ('AFTimerange is of type '+ str(type(event_dataframe['AFTimerange'].iloc[0])) +'(do not use views)')
-                    
-                event_dataframe = event_dataframe[event_dataframe['Level'] == level][['Path', 'Starttime', 'Endtime', 'AFTimerange']].copy()
-                
-                #Batch and phase based on path
-                event_dataframe[['Batch','Phase']] = event_dataframe['Path'].str.split('\\', expand=True, n=5).loc[:, 4:]
-                event_dataframe.replace({'Batch':{'EventFrames\[':'', '\]':''}}, regex=True, inplace=True) #partial replacements
-        
-                df_MVA = event_dataframe[['Batch','Phase','Starttime','Endtime', 'AFTimerange']]
-                df_MVA.reset_index(drop = True, inplace=True)
-                
-                #get tag data as df, convert to list of tuples (.to_records) and explode
-                print('Fetching Tag data...')
-                df_MVA['Time'] = df_MVA['AFTimerange'].apply(lambda x: list(self.get_interpolated_values_multiple_AFTimerange(tag_list, x, interval).to_records(index=True)))
-        
-                df_MVA = df_MVA.explode('Time') #explode list to rows
-                df_MVA['Time'] = df_MVA['Time'].apply(lambda x: [el for el in x]) #numpy record to list
-                df_MVA[['Time'] + [str(tag) for tag in tag_list]] = df_MVA['Time'].apply(pd.Series) #explode list to columns
-                df_MVA['Time'] = df_MVA['Time'].apply(lambda x: add_timezone(x))
-                
-                #format
-                df_MVA = df_MVA [['Batch', 'Phase', 'Time'] +[str(tag) for tag in tag_list]]
-                df_MVA.reset_index(drop = True, inplace=True)
-                df_MVA.sort_values(by=['Time'], ascending=True, inplace=True)
-                for col in df_MVA.columns:
-                    df_MVA.loc[df_MVA[col].apply(lambda x: str(type(x)) == "<class 'OSIsoft.AF.Asset.AFEnumerationValue'>"), col] = np.nan
-                df_MVA.dropna(inplace=True) #in case of selecting nonsubsequent phases for a batch are filtered out (data is captured per batch in single call)
-                return df_MVA
-            
-            else:
-                raise Exception('It seems like you are using a flat dataframe, please specify a Level/Template')
-            
-        else: #condensed dataframe
-            print('building MVA table from condensed eventframe dataframe...')
-
-            #only Name columns and AFTimerange get selected
-            cols = [col_name for col_name in event_dataframe.columns if col_name.startswith('Name')]
-            col_starttime = [col_name for col_name in event_dataframe.columns if col_name.startswith('Starttime')][-1]
-            col_endtime = [col_name for col_name in event_dataframe.columns if col_name.startswith('Endtime')][-1]
-            
-            if str(type(event_dataframe[col_starttime].iloc[0])) != "<class 'pandas._libs.tslibs.timestamps.Timestamp'>":
-                raise Exception ('Starttime is of type '+ str(type(event_dataframe[col_starttime].iloc[0])) +'(do not use views)')
-            if str(type(event_dataframe[col_endtime].iloc[0])) != "<class 'pandas._libs.tslibs.timestamps.Timestamp'>":
-                raise Exception ('Endtime is of type '+ str(type(event_dataframe[col_endtime].iloc[0])) +'(do not use views)')
-            
-            cols.append(col_starttime)
-            cols.append(col_endtime)
-            df_mva = event_dataframe[cols].copy()
-            df_mva.reset_index(drop = True, inplace=True)
-            
-            #get tag data as df, convert to list of tuples (.to_records) and explode
-            print('Fetching Tag data...')
-            
-            df_MVA = pd.DataFrame()
-            for i, proc in df_mva.groupby(cols[:-2]): #completely accurate would be per procedure & phase to have right starting time for each phase, this is more efficient though (per procedure) = Done?
-                start = proc.iloc[0,-2]
-                end = proc.iloc[-1,-1]
-                values = list(self.get_interpolated_values_multiple(tag_list, start, end, interval).to_records(index=True))
-                df_MVA = df_MVA.append(pd.DataFrame([[i, values]], columns=['Batch', 'Time']), ignore_index=True)
-
-            df_MVA = df_MVA.explode('Time') #explode list to rows
-            df_MVA['Time'] = df_MVA['Time'].apply(lambda x: [el for el in x]) #numpy record to list
-            df_MVA[['Time'] + [str(tag) for tag in tag_list]] = df_MVA['Time'].apply(pd.Series) #explode list to columns
-            df_MVA['Time'] = df_MVA['Time'].apply(lambda x: add_timezone(x))
-
-            #add phase info back
-            df_MVA['Batch'] = df_MVA['Batch'].apply(lambda x: tuple_split(list(x)))
-            df_MVA[['Batch', 'Phase']] = pd.DataFrame(df_MVA['Batch'].tolist(), index=df_MVA.index)
-            
-            #format
-            #df_MVA.drop([col_timerange] + cols[1:-1], 1, inplace=True)
-            df_MVA = df_MVA [['Batch', 'Phase', 'Time'] +[str(tag) for tag in tag_list]]
-            df_MVA.reset_index(drop = True, inplace=True)
-            df_MVA.sort_values(by=['Time'], ascending=True, inplace=True)
-            df_MVA.reset_index(drop = True, inplace=True)
-            
-            #remove time that is AFEnumerationValue
-            df_MVA.loc[df_MVA['Time'].apply(lambda x: str(type(x)) == "<class 'OSIsoft.AF.Asset.AFEnumerationValue'>"), 'Time'] = np.nan
-            df_MVA.dropna(inplace=True) #in case of previous (time out), or in case of selecting nonsubsequent phases for a batch are filtered out (data is captured per batch in single call)
-            for col in df_MVA.columns:
-                df_MVA.loc[df_MVA[col].apply(lambda x: str(type(x)) == "<class 'OSIsoft.AF.Asset.AFEnumerationValue'>"), col] = df_MVA.loc[df_MVA[col].apply(lambda x: str(type(x)) == "<class 'OSIsoft.AF.Asset.AFEnumerationValue'>"), col].astype(str)
-
-            
-            #for col in df_MVA.columns:
-            #    df_MVA.loc[df_MVA[col].apply(lambda x: str(type(x)) == "<class 'OSIsoft.AF.Asset.AFEnumerationValue'>"), col] = 'XXXXXX'
-            #df_MVA.dropna(inplace=True) #in case of previous (time out), or in case of selecting nonsubsequent phases for a batch are filtered out (data is captured per batch in single call)
-
-            return df_MVA
-    
-    
-    def to_overlay(self, event_dataframe, tag_list, interval, level=None):
-        if 'Name' in event_dataframe.columns: #flat dataframe
-            if level:
-                #translate template to correspondinglevel if applicable
-                if type(level) == str:
-                    level = event_dataframe.loc[event_dataframe['Template']==level, 'Level'].iloc[0]
-                print('building overlay table from flat eventframe dataframe...')
-                
-                if str(type(event_dataframe['Starttime'].iloc[0])) != "<class 'pandas._libs.tslibs.timestamps.Timestamp'>":
-                    raise Exception ('Starttime is of type '+ str(type(event_dataframe['Starttime'].iloc[0])) +'(do not use views)')
-                if str(type(event_dataframe['Endtime'].iloc[0])) != "<class 'pandas._libs.tslibs.timestamps.Timestamp'>":
-                    raise Exception ('Endtime is of type '+ str(type(event_dataframe['Endtime'].iloc[0])) +'(do not use views)')
-                    
-                event_dataframe = event_dataframe[event_dataframe['Level'] == level][['Path', 'Starttime', 'Endtime']].copy()
-
-                #Batch and phase based on path
-                event_dataframe[['Batch','Phase']] = event_dataframe['Path'].str.split('\\', expand=True, n=5).loc[:, 4:]
-                event_dataframe.replace({'Batch':{'EventFrames\[':'', '\]':''}}, regex=True, inplace=True) #partial replacements
-                event_dataframe = event_dataframe[['Batch','Phase','Starttime','Endtime']]
-                event_dataframe.reset_index(drop = True, inplace=True)
-                
-                #get tag data as df, convert to list of tuples (.to_records) and explode
-                print('Fetching Tag data...')
-                df_overlay = pd.DataFrame()
-                for i, proc in event_dataframe.groupby('Batch'):
-                    start = proc.iloc[0,-2]
-                    end = proc.iloc[-1,-1]
-                    values = list(self.get_interpolated_values_multiple(tag_list, start, end, interval).to_records(index=True))
-                    df_overlay = df_overlay.append(pd.DataFrame([[i, values]], columns=['Batch', 'Time']), ignore_index=True)
-                
-                df_overlay = df_overlay.explode('Time') #explode list to rows
-                df_overlay['Time'] = df_overlay['Time'].apply(lambda x: [el for el in x]) #numpy record to list
-                df_overlay[['Time'] + [str(tag) for tag in tag_list]] = df_overlay['Time'].apply(pd.Series) #explode list to columns
-                #add_timezone nog nut hier?
-                df_overlay['Time'] = df_overlay['Time'].apply(lambda x: add_timezone(x))
-                
-                #add phase info back
-                df_overlay['Phase'] = np.nan
-                for i, row in event_dataframe.iterrows():
-                    df_overlay['Phase'].loc[(df_overlay['Time'] >= row['Starttime']) & 
-                                            (df_overlay['Time'] <= row['Endtime'])] = row['Phase']
-                
-                #format
-                df_overlay = df_overlay[['Batch', 'Phase', 'Time'] +[str(tag) for tag in tag_list]]
-                df_overlay.reset_index(drop = True, inplace=True)
-                df_overlay.sort_values(by=['Time'], ascending=True, inplace=True)
-                #for col in df_overlay.columns:
-                #    df_overlay.loc[df_overlay[col].apply(lambda x: str(type(x)) == "<class 'OSIsoft.AF.Asset.AFEnumerationValue'>", col)] = np.nan
-                return view(df_overlay)
-            
-            else:
-                raise Exception('It seems like you are using a flat dataframe, please specify a Level/Template')
-            
-        else: #condensed dataframe
-            print('building overlay table from condensed eventframe dataframe...')
-            #only Name columns and AFTimerange get selected
-            cols = [col_name for col_name in event_dataframe.columns if col_name.startswith('Name')]
-            col_starttime = [col_name for col_name in event_dataframe.columns if col_name.startswith('Starttime')][-1]
-            col_endtime = [col_name for col_name in event_dataframe.columns if col_name.startswith('Endtime')][-1]
-            
-            if str(type(event_dataframe[col_starttime].iloc[0])) != "<class 'pandas._libs.tslibs.timestamps.Timestamp'>":
-                raise Exception ('Starttime is of type '+ str(type(event_dataframe[col_starttime].iloc[0])) +'(do not use views)')
-            if str(type(event_dataframe[col_endtime].iloc[0])) != "<class 'pandas._libs.tslibs.timestamps.Timestamp'>":
-                raise Exception ('Endtime is of type '+ str(type(event_dataframe[col_endtime].iloc[0])) +'(do not use views)')
-            
-            cols.append(col_starttime)
-            cols.append(col_endtime)
-            df_MVA = event_dataframe[cols].copy()
-            df_MVA.reset_index(drop = True, inplace=True)
-            
-            #get tag data as df, convert to list of tuples (.to_records) and explode
-            print('Fetching Tag data...')
-            
-            df_overlay = pd.DataFrame()
-            for i, proc in df_MVA.groupby('Name [Procedure]'):
-                start = proc.iloc[0,-2]
-                end = proc.iloc[-1,-1]
-                values = list(self.get_interpolated_values_multiple(tag_list, start, end, interval).to_records(index=True))
-                df_overlay = df_overlay.append(pd.DataFrame([[i, values]], columns=['Batch', 'Time']), ignore_index=True)
-            
-            df_overlay = df_overlay.explode('Time') #explode list to rows
-            df_overlay['Time'] = df_overlay['Time'].apply(lambda x: [el for el in x]) #numpy record to list
-            #get tag values from point?
-            #pd.DataFrame(df['b'].tolist(), index=df.index) instead of apply(pd.Series) = faster
-            df_overlay[['Time'] + [str(tag) for tag in tag_list]] = df_overlay['Time'].apply(pd.Series) #explode list to columns
-            df_overlay['Time'] = df_overlay['Time'].apply(lambda x: add_timezone(x))
-
-            #add phase info back
-            df_MVA['Phase'] = df_MVA[cols[1:-2]].apply(lambda x: '\\'.join(x.values.astype(str)), axis=1)
-            df_overlay['Phase'] = np.nan
-            for i, row in df_MVA.iterrows():
-                df_overlay['Phase'].loc[(df_overlay['Time'] >= row[col_starttime]) & 
-                                        (df_overlay['Time'] <= row[col_endtime])] = row['Phase']
-            
-            #format
-            df_overlay = df_overlay[['Batch', 'Phase', 'Time'] +[str(tag) for tag in tag_list]]
-            df_overlay.sort_values(by=['Time'], ascending=True, inplace=True)
-            df_overlay.reset_index(drop = True, inplace=True)
-            #for col in df_overlay.columns:
-            #    df_overlay.loc[df_overlay[col].apply(lambda x: str(type(x)) == "<class 'OSIsoft.AF.Asset.AFEnumerationValue'>", col)] = np.nan
-            return view(df_overlay)
-
-            
-    def get_tags(self, query):
-        tags = self.search(str(query))
-        
-        df = pd.DataFrame()
-        df['PIPoint'] = [tag for tag in tags]
-        #load attributes before GET
-        df['PIPoint'].apply(lambda x: x.LoadAttributes(['descriptor', 'engunits']))
-        df['Name'] = df['PIPoint'].apply(lambda x: x.Name)
-        df['Description'] = df['PIPoint'].apply(lambda x: x.GetAttribute('descriptor'))
-        df['UOM'] = df['PIPoint'].apply(lambda x: x.GetAttribute('engunits'))
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_PI_PIPointType.htm
-        df['PointType'] = df['PIPoint'].apply(lambda x: x.PointType)
-        df['PointType_desc'] = df['PointType'].apply(lambda x: str(PIPointType(x)))
-        return df
-    
- #aux function
-def tuple_split(x): #used in to_MVA
-        x[1:] = ['\\'.join(x[1:])]
-        return x
+   
+#aux functions
 
 def generate_pipointlist(tag_list):
     '''Generate and populate object of PIPointList class from TagList object'''
@@ -1161,3 +669,14 @@ def convert_to_TagList(tag_list, dataserver=None):
                  return dataserver.search(tag_list)
             else:
                  raise AttributeError('Please specifiy a dataserver when using tags in string format')
+
+def view(dataframe):
+    '''returns string/float version of dataframe that can be viewed in the variable console'''
+    dataframe = dataframe.copy() #needs to return a copy
+    for colname in dataframe.loc[:, ~dataframe.columns.isin(['Starttime','Endtime'])]:
+        dataframe[colname] = dataframe[colname].astype(str)
+        try:
+            dataframe[colname] = dataframe[colname].astype(float)
+        except:
+            pass
+    return dataframe
