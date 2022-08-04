@@ -44,7 +44,7 @@ from warnings import warn
 
 from JanssenPI._utils import classproperty
 from JanssenPI.AFSDK import AF
-from JanssenPI.PIConsts import EventFrameSearchMode, SearchMode, SortField, SortOrder, SummaryType, CalculationBasis, TimestampCalculation, BoundaryType, ExpressionSampleType
+from JanssenPI.PIConsts import EventFrameSearchMode, SearchMode, SortField, SortOrder, SummaryType, CalculationBasis, TimestampCalculation, BoundaryType, ExpressionSampleType, SearchField
 from JanssenPI.time import timestamp_to_index, add_timezone
 from JanssenPI.config import PIConfig
 from JanssenPI.PI import Tag, generate_pipointlist, convert_to_TagList
@@ -176,16 +176,32 @@ class PIAFDatabase(object):
     
     def find_events(self,
         query=None,
+        asset='*',
         start_time=None,
         end_time='*',
+        template_name = None,
         start_index=0,
         max_count=1000000,
         search_mode=SearchMode.OVERLAPPED,
         search_full_hierarchy=True,
         sortField=SortField.STARTTIME,
         sortOrder=SortOrder.ASCENDING):
-        '''Return a EventList of AF Events'''
-
+        '''Return a EventList of Events the meet query'''
+        
+        if template_name:
+            try:
+                afsearchField = SearchField.NAME
+                template = AF.Asset.AFElementTemplate.FindElementTemplates(self.database,
+                                                                           template_name,
+                                                                            afsearchField,
+                                                                            sortField,
+                                                                            sortOrder,
+                                                                            max_count)[0]
+            except:
+                raise AttributeError('Template name was not found')
+        else:
+            template = None
+        
         if not start_time:
             start_time = AF.Time.AFTime.Now
                
@@ -196,9 +212,9 @@ class PIAFDatabase(object):
                 start_time,
                 end_time,
                 query,
-                '*',
+                asset,
                 None,
-                None,
+                template,
                 None,
                 None,
                 search_full_hierarchy,
@@ -209,8 +225,28 @@ class PIAFDatabase(object):
                 
         return EventList([Event(event) for event in lst])
 
-    #find events by path, attribute, referenced element ---------------
+    #find events by path, attribute, referenced element(done) ---------------
     
+    #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_Asset_AFElement_FindElements_2.htm
+    def find_assets(self,
+                query = None,
+                top_asset = None,
+                searchField = SearchField.NAME,
+                search_full_hierarchy = True, 
+                sortField = SortField.STARTTIME, 
+                sortOrder = SortOrder.ASCENDING, 
+                Int32 = 10000000):
+        '''Return list of Assets that meet query'''
+        
+        lst = AF.Asset.AFElement.FindElements(self.database, 
+                                              top_asset, 
+                                              query, 
+                                              searchField, 
+                                              search_full_hierarchy, 
+                                              sortField, 
+                                              sortOrder, 
+                                              Int32)
+        return [Asset(x) for x in lst]
 
     def all_assets(self, af_asset_list=[], depth=10):
         '''return dataframe with hierarchical AF Asset structure'''
@@ -800,7 +836,7 @@ class Asset:
     #Properties
     @property
     def name(self):
-        '''Return name of event'''
+        '''Return name of Asset'''
         return self.asset.Name
     @property
     def path(self):
@@ -835,22 +871,22 @@ class Asset:
             return None
     @property
     def attributes(self):
-        ''''Return list of attribute names for event'''
+        ''''Return list of attribute names for Asset'''
         return [attribute.Name for attribute in self.asset.Attributes]
     @property
     def af_attributes(self):
-        ''''Return list of AFAttributes for event'''
+        ''''Return list of AFAttributes for Asset'''
         return [attribute for attribute in self.asset.Attributes]  
     def children(self):
-        '''Return EventList of children for event'''
+        '''Return List of children for Asset'''
         return list([Asset(asset) for asset in self.asset.children])
     @property
     def parent(self):
-        '''Return parent event for event'''
+        '''Return parent Asset for Asset'''
         return Asset(self.asset.Parent)
     @property
     def description(self):
-        '''Return description for event'''
+        '''Return description for Asset'''
         return self.asset.Description
     
     #methods
@@ -866,6 +902,21 @@ class Asset:
                 if attribute.Name in attribute_names_list:
                     attribute_dct[attribute.Name] = attribute.GetValue().Value
             return attribute_dct
+    
+    def get_events(self,
+                   query=None,
+                   start_time=None,
+                   end_time='*',
+                   template_name = None,
+                   start_index=0,
+                   max_count=1000000,
+                   search_mode=SearchMode.OVERLAPPED,
+                   search_full_hierarchy=True,
+                   sortField=SortField.STARTTIME,
+                   sortOrder=SortOrder.ASCENDING):
+        '''Return EventList of Events on Asset within specified time period'''
+        asset=self.name
+        return self.database.find_events(query, asset, start_time, end_time, template_name, start_index, max_count, search_mode, search_full_hierarchy, sortField, sortOrder)
 
 try:
     #delete the accessor to avoid warning 
