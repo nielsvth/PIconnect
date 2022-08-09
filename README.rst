@@ -1,60 +1,85 @@
 #########
-PIconnect
+JanssenPI
 #########
 
-A python connector to the OSISoft PI and PI-AF databases
+A Python connector to the OSISoft PI AF SDK
 ========================================================
 
-This connector allows access to the OSISoft PI System through their
-proprietary SDK. It provides a number of classes, mostly mirroring the AF SDK
-structure, but at the same time implementing the cool stuff we use Python for.
-Connections to the database are therefore implemented as context managers, to
-allow opening a connection using a with statement.
+JanssenPI provides a programmatic interface in Python to the OSISoft PI AF SDK. 
+JanssenPI is a package which was built upon the PIconnect package to include additional functionality for working with Assets and hierarchical EventFrames.
+It also provides added functionality for executing bulk queries. 
 
-.. image:: https://img.shields.io/pypi/v/PIconnect.svg
-    :target: https://pypi.python.org/pypi/PIconnect
-    :alt: PIconnect on PyPI
-
-.. image:: https://img.shields.io/conda/vn/conda-forge/piconnect
-    :target: https://anaconda.org/conda-forge/piconnect
-    :alt: PIconnect on conda-forge
-
-.. image:: https://github.com/Hugovdberg/PIconnect/actions/workflows/ci.yml/badge.svg?branch=develop
-    :target: https://github.com/Hugovdberg/PIconnect/actions/workflows/ci.yml
-    :alt: Continuous Integration status
-
-.. image:: https://readthedocs.org/projects/piconnect/badge/?version=develop
-    :target: https://piconnect.readthedocs.io/en/latest/?badge=develop
-    :alt: Documentation Status
-
-.. image:: https://pyup.io/repos/github/Hugovdberg/PIconnect/shield.svg
-    :target: https://pyup.io/repos/github/Hugovdberg/PIconnect/
-    :alt: Security Updates
-
-.. image:: https://api.codacy.com/project/badge/Grade/568734c85e07467c99e0e791d8eb17b6
-    :target: https://www.codacy.com/app/Hugovdberg/PIconnect?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Hugovdberg/PIconnect&amp;utm_campaign=Badge_Grade
-    :alt: Automated code review
-
-.. image:: https://img.shields.io/badge/code%20style-black-000000.svg
-    :target: https://github.com/psf/black
-    :alt: Code style: black
-
-Python connector to OSIsoft PI SDK
-
+The basic introduction to working with the JanssenPI package is covered in the Tutorial below.
 
 * Free software: MIT license
-* Documentation: https://piconnect.readthedocs.io.
 
+Tutorial
+========================================================
 
-Features
---------
-Features below are for both: PI Server and PIAF Database:
+1. Connection
+*******************************************************
 
-* Extract recorded values
-* Extract interpolated values
-* Update a value
-* Summarize data before extraction with help of OSIsoft PI SDK
-* Filter data before extraction with help of OSIsoft PI SDK
+.. code-block:: python
+
+    import JanssenPI
+    
+    #set up timezone
+    #Pick timezone from https://gist.github.com/heyalexej/8bf688fd67d7199be4a1682b3eec7568  
+    JanssenPI.PIConfig.DEFAULT_TIMEZONE = 'Europe/Brussels'
+
+    #List of available PI data servers
+    print(list(JanssenPI.PIServer.servers.keys()))
+
+    #List of available PI AF servers 
+    print(list(JanssenPI.PIAFDatabase.servers.keys()))
+
+    #List of available PI AF databases for specified server
+    print(list(JanssenPI.PIAFDatabase.servers['PIMS_EU_BEERSE_AF_PE']['databases'].keys()))
+
+    #Initiate connection to PI data server & PI AF database of interest 
+    with JanssenPI.PIAFDatabase(server='PIMS_EU_BEERSE_AF_PE', database='DeltaV-Events') as afdatabase, JanssenPI.PIServer(server='ITSBEBEPIHISCOL') as server:
+        
+        #print name of specified server
+        print(server.server_name)
+        
+        #print server and database name for specified AF database
+        print(f'{afdatabase.server_name}\\{afdatabase.database_name}')
+        
+        #...<All other code blocks are inserted here>...
+
+2. Asset
+*******************************************************
+
+Assets usually refer to pieces of equipment and are structured in hierarchies (Asset Framework, AF).
+The following tutorial elaborates on the Asset class and some of its key attributes & methods. 
+
+.. code-block:: python
+
+    #Returns list of Assets that meet the query criteria
+    assetlist = afdatabase.find_assets(query='091_R022')
+    
+    #Select the Asset from the Asset list 
+    asset = assetlist[0]
+    
+    #Some Asset class attributes
+    print(asset.name)
+    print(asset.parent.name)
+    
+    #Get EventList of Events on this Asset that meet the query criteria
+    events = asset.get_events(start_time='*-50d', end_time='*')
+    events = asset.get_events(start_time='*-50d', end_time='*', template_name='Phase')
+
+2. AssetHierarchy
+*******************************************************
+
+.. code-block:: python
+    
+    #Return full Asset Framework up to specified hierachy depth
+    afhierarchy = afdatabase.all_assets(depth=10)
+    
+    #Make afhierarchy visible in variable explorer (string & float representation)
+    viewable = JanssenPI.PI.view(afhierarchy)
+
 
 Copyright notice
 ================
@@ -69,11 +94,4 @@ SDK, PI Server, PI Square, PI System, PI System Access, PI Vision, PI
 Visualization Suite, PI Web API, PI WebParts, PI Web Services, RLINK and
 RtReports are all trademarks of OSIsoft, LLC.
 
-Credits
----------
 
-This package was created with Cookiecutter_ and the
-`audreyr/cookiecutter-pypackage`_ project template.
-
-.. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
