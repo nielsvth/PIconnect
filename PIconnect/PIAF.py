@@ -375,7 +375,10 @@ class Event:
         try:
             return self.endtime - self.starttime
         except: #NaT endtime
-            return timedelta.max
+            #return timedelta.max
+            local_tz = timezone(PIConfig.DEFAULT_TIMEZONE)
+            return (datetime.utcnow().replace(tzinfo=utc).astimezone(local_tz) - self.starttime)
+         
     @property
     def procedure(self):
         '''Return top-level procedure name for this event'''
@@ -391,6 +394,10 @@ class Event:
     def interpolated_values(self, tag_list, interval, dataserver=None, filter_expression=''):
         ''''Return Dataframe of interpolated values for tags specified by list of tagnames or PIPoint, between starttime and endtime'''
         taglist = convert_to_TagList(tag_list, dataserver)
+        if type(self.endtime) == float:
+            local_tz = timezone(PIConfig.DEFAULT_TIMEZONE)
+            endtime = datetime.utcnow().replace(tzinfo=utc).astimezone(local_tz)
+            return taglist.interpolated_values(self.starttime, endtime, interval)
         return taglist.interpolated_values(self.starttime, self.endtime, interval)
         
     def recorded_values(self, tag_list, dataserver=None, filter_expression='', AFBoundaryType=BoundaryType.INSIDE):
@@ -532,7 +539,7 @@ class EventList(UserList):
             df_events['Starttime'] = df_events['Event'].apply(lambda x: x.starttime if x else np.nan)
             df_events['Endtime'] = df_events['Event'].apply(lambda x: x.endtime if x else np.nan)
 
-            print('This Event Hierarch has structure of "\\\\Server\\Database\\{}"'.format('\\'.join([str(ev) for ev in df_events['Template'].unique()]))) #not completely correct if different templates on a single level
+            print('This Event Hierarchy has structure of "\\\\Server\\Database\\{}"'.format('\\'.join([str(ev) for ev in df_events['Template'].unique()]))) #not completely correct if different templates on a single level
             return df_events
 
         else:
@@ -585,37 +592,41 @@ class EventHierarchy:
             template_name = self.df.loc[self.df['Level']==template_name, 'Template'].iloc[0]
 
         ref_el = self.df.loc[self.df['Template']==template_name, 'Event'].apply(lambda x: x.ref_elements).apply(pd.Series)
+        
+        if ref_el.empty:
+            raise AttributeError('No results found for the specified template')
+        
         for col in ref_el.columns:
             self.df['Referenced_el'+' ['+str(template_name)+']'+'('+str(col)+')'] = ref_el[col]
         return self.df
-            
-    def condense(self, level=10):
-        ''''Return condensed dataframe for event dataframe, up to specified template/level'''
+     
+    def condense(self):
+        ''''Return condensed dataframe based on events in EventHierarchy'''
         print('Condensing...')
-        if type(level) == str:
-            level = self.df.loc[self.df['Template']==level, 'Level'].iloc[0]
         
-        self.df = self.df[self.df['Level']<=level].copy()
+        df = self.df.copy()
+        
         #merge level by level
-        i=0
-        for level, df_level in self.df.groupby('Level'):
+        for level in range(int(df['Level'].min()), int(df['Level'].max()+1)):
+            #subdf per level
+            df_level = df[df['Level'] == level]
             #remove empty columns
             df_level.dropna(how='all', axis=1, inplace=True)
-            #get template name
-            temp = df_level['Template'].unique()[0] 
-            #add auxiliary columns for merge based on path
-            cols = [x for x in range(int(level)+1)]
-            df_level[cols] = df_level['Path'].str.split('\\', expand=True).loc[:, 4:]
-            #remove Path columns
-            df_level.drop(['Path'], 1, inplace=True)
-            #rename columns, ignore columns with number names
-            df_level.columns = [col_name + ' [' + temp + ']' if not ((type(col_name) == int) or ('[' in col_name)) else col_name for col_name in df_level.columns]
-            #merge with previous level
-            if i == 0:
-                df_condensed = df_level
-                i+=1
+            if df_level.empty:
+                df_condensed[level] = 'TempValue'
             else:
-                df_condensed = pd.merge(df_condensed, df_level, how='right', left_on=cols[:-1], right_on=cols[:-1])
+                #add auxiliary columns for merge based on path
+                cols = [x for x in range(level+1)]
+                df_level[cols] = df_level['Path'].str.split('\\', expand=True).loc[:, 4:]
+                #remove Path columns
+                df_level.drop(['Path'], 1, inplace=True)
+                #rename columns, ignore columns with number names
+                df_level.columns = [col_name + ' [' + str(int(level)) + ']' if not ((type(col_name) == int) or ('[' in col_name)) else col_name for col_name in df_level.columns]
+                #merge with previous level
+                if level == int(df['Level'].min()):
+                    df_condensed = df_level
+                else:
+                    df_condensed = pd.merge(df_condensed, df_level, how='outer', left_on=cols[:-1], right_on=cols[:-1])
         #drop auxiliary columns 
         df_condensed.drop([col_name for col_name in df_condensed.columns if type(col_name) == int], 1, inplace=True)
         #remove duplicates
@@ -630,7 +641,81 @@ class EventHierarchy:
                 df_condensed[col].fillna(now, inplace=True)
             else: #handle naT in lower layers by inheriting from parent
                 df_condensed[col].fillna(df_condensed[endtime_cols[i-1]], inplace=True)
+                
         return df_condensed
+    
+    def interpol_discrete_extract(self, tag_list, interval, dataserver=None, col=False):
+        '''Return dataframe of interpolated data for discrete events of EventHierarchy'''
+        print('building discrete extract table from EventHierachy...')
+        df = self.df.copy()
+        
+        #performance checks
+        maxi = max(df['Event'].apply(lambda x: x.duration))
+        if maxi > pd.Timedelta("60 days"):
+            print (f'Large Event(s) with duration up to {maxi} detected, Note that this might take some time...')
+        if len(df) > 50:
+            print(f'Extracts will be made for {len(df)} Events, Note that this might take some time...')
+        
+        if col == False:
+            taglist = convert_to_TagList(tag_list, dataserver)
+            #extract interpolated data for discrete events
+            df['Time'] = df['Event'].apply(lambda x: list(x.interpolated_values(taglist, interval).to_records(index=True)))
+        
+        if col == True:
+            if len(tag_list) > 1:
+                raise AttributeError (f'You can only specify a single tag column at a time')
+            if tag_list[0] in df.columns:
+                event = df.columns.get_loc('Event')
+                tags = df.columns.get_loc(tag_list[0])
+                #extract interpolated data for discrete events
+                df['Time'] = df.apply(lambda row: list(row[event].interpolated_values([row[tags]], interval).to_records(index=True)), axis=1)
+            else:
+                raise AttributeError (f'The column option was set to True, but {tag_list} is not a valid column')
+        
+        df = df.explode('Time') #explode list to rows
+        df['Time'] = df['Time'].apply(lambda x: [el for el in x]) #numpy record to list
+        df[['Time'] + [tag.name for tag in taglist]] = df['Time'].apply(pd.Series) #explode list to columns
+        df['Time'] = df['Time'].apply(lambda x: add_timezone(x))
+        df.reset_index(drop = True, inplace=True)
+
+        return df
+
+    def summary_extract(self, tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, col=False):
+        '''Return dataframe of summary measures for discrete events of EventHierarchy'''
+        print('Building summary table from EventHierachy...')
+        df =  self.df.copy()
+        
+        #performance checks
+        maxi = max(df['Event'].apply(lambda x: x.duration))
+        if maxi > pd.Timedelta("60 days"):
+            print (f'Large Event(s) with duration up to {maxi} detected, Note that this might take some time...')
+        if len(df) > 50:
+            print(f'Summaries will be calculated for {len(df)} Events, Note that this might take some time...')
+        
+        if col == False:
+            taglist = convert_to_TagList(tag_list, dataserver)
+            #extract summary data for discrete events
+            df['Time'] = df['Event'].apply(lambda x: list(x.summary(taglist, summary_types, dataserver, calculation_basis, time_type).to_records(index=False)))
+        
+        if col == True:
+            if len(tag_list) > 1:
+                raise AttributeError (f'You can only specify a single tag column at a time')
+            if tag_list[0] in df.columns:
+                event = df.columns.get_loc('Event')
+                tags = df.columns.get_loc(tag_list[0])
+                #extract summary data for discrete events
+                df['Time'] = df.apply(lambda row: list(row[event].summary([row[tags]], summary_types, dataserver, calculation_basis, time_type).to_records(index=False)), axis=1)
+            else:
+                raise AttributeError (f'The column option was set to True, but {tag_list} is not a valid column')
+
+        df = df.explode('Time') #explode list to rows
+        df['Time'] = df['Time'].apply(lambda x: [el for el in x]) #numpy record to list
+        df[['Tag', 'Summary', 'Value', 'Time']] = df['Time'].apply(pd.Series) #explode list to columns
+        df['Time'] = df['Time'].apply(lambda x: add_timezone(x))
+        df.reset_index(drop = True, inplace=True)
+        
+        return df
+        
 
 try:
     #delete the accessor to avoid warning 
@@ -656,35 +741,75 @@ class CondensedHierarchy:
                 raise AttributeError("This dataframe does not have the correct EventHierarchy format") 
 
     #Methods
-    def interpol_discrete_extract(self, tag_list, interval, dataserver=None):
+    
+    
+    def interpol_discrete_extract(self, tag_list, interval, dataserver=None, col=False):
         '''Return dataframe of interpolated data for discrete events on bottom level of condensed hierarchy'''
-        taglist = convert_to_TagList(tag_list, dataserver)
-       
         print('building discrete extract table from condensed hierachy...')
         #select events on bottem level of condensed hierarchy
         col_event = [col_name for col_name in self.df.columns if col_name.startswith('Event')][-1]
-
-        df_dis = self.df[[col_event]].copy()
-        df_dis.columns = ['Event']
-        #add procedure names
-        df_dis['Procedure'] = df_dis['Event'].apply(lambda x: x.procedure)
-        df_dis = df_dis[['Procedure', 'Event']]
-        df_dis.reset_index(drop = True, inplace=True)
         
-        #extract interpolated data for discrete events
-        df_dis['Time'] = df_dis.apply(lambda row: list(row[1].interpolated_values(taglist, interval).to_records(index=True)), axis=1)
+        #based on list of tags
+        if col == False:
+            df = self.df[[col_event]].copy()
+            df.columns = ['Event']
+            
+            #performance checks
+            maxi = max(df['Event'].apply(lambda x: x.duration))
+            if maxi > pd.Timedelta("60 days"):
+                print (f'Large Event(s) with duration up to {maxi} detected, Note that this might take some time...')
+            if len(df) > 50:
+                print(f'Summaries will be calculated for {len(df)} Events, Note that this might take some time...')
+            
+             #add procedure names
+            df['Procedure'] = df['Event'].apply(lambda x: x.procedure)
+            df = df[['Procedure', 'Event']]
+            df.reset_index(drop = True, inplace=True)
+        
+            taglist = convert_to_TagList(tag_list, dataserver)
+            #extract interpolated data for discrete events
+            df['Time'] = df['Event'].apply(lambda x: list(x.interpolated_values(taglist, interval).to_records(index=True)))
+        
+        #based on column with tags
+        if col == True:
+            if len(tag_list) > 1:
+                raise AttributeError (f'You can only specify a single tag column at a time')
+            if tag_list[0] in self.df.columns:
+                df = self.df[[col_event, tag_list[0]]].copy()
+                df.columns = ['Event', 'Tags']
+            else:
+                raise AttributeError (f'The column option was set to True, but {tag_list} is not a valid column')
+            
+            #performance checks
+            maxi = max(df['Event'].apply(lambda x: x.duration))
+            if maxi > pd.Timedelta("60 days"):
+                print (f'Large Event(s) with duration up to {maxi} detected, Note that this might take some time...')
+            if len(df) > 50:
+                print(f'Summaries will be calculated for {len(df)} Events, Note that this might take some time...')
+                
+            #add procedure names
+            df['Procedure'] = df['Event'].apply(lambda x: x.procedure)
+            df = df[['Procedure', 'Event', 'Tags']]
+            df.reset_index(drop = True, inplace=True)
+        
+            event = df.columns.get_loc('Event')
+            tags = df.columns.get_loc('Tags')
+            #extract interpolated data for discrete events
+            df['Time'] = df.apply(lambda row: list(row[event].interpolated_values([row[tags]], interval, dataserver).to_records(index=True)), axis=1)
+            
+            taglist = convert_to_TagList(list(df['Tags'].unique()), dataserver)
 
-        df_dis = df_dis.explode('Time') #explode list to rows
-        df_dis['Time'] = df_dis['Time'].apply(lambda x: [el for el in x]) #numpy record to list
-        df_dis[['Time'] + [tag.name for tag in taglist]] = df_dis['Time'].apply(pd.Series) #explode list to columns
-        df_dis['Time'] = df_dis['Time'].apply(lambda x: add_timezone(x))
-        df_dis.reset_index(drop = True, inplace=True)
+        df = df.explode('Time') #explode list to rows
+        df['Time'] = df['Time'].apply(lambda x: [el for el in x]) #numpy record to list
+        df[['Time'] + [tag.name for tag in taglist]] = df['Time'].apply(pd.Series) #explode list to columns
+        df['Time'] = df['Time'].apply(lambda x: add_timezone(x))
+        df.reset_index(drop = True, inplace=True)
 
-        return df_dis
-
+        return df
+    
 
     def interpol_continuous_extract(self, tag_list, interval, dataserver=None):
-        '''Return dataframe of continous, interpolated data from the start of the first filtered event to the end of the last filtered event for each procedure on bottem level of condensed hierarchy'''
+        '''Return dataframe of continous, interpolated data from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy'''
         taglist = convert_to_TagList(tag_list, dataserver)
 
         print('building continuous extract table from condensed hierachy...')
@@ -793,34 +918,86 @@ class CondensedHierarchy:
         return dct
     
     
+    #option to specify column with tagnames to refer to instead of taglist? -----------------
     
-    def summary_extract(self, tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO):
+    def summary_extract(self, tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, col=False):
         '''Return dataframe of summary data for events on bottom level of condensed hierarchy'''
-        taglist = convert_to_TagList(tag_list, dataserver)
-           
-        print('building summary table from condensed hierachy...')
+ 
+        print('building discrete extract table from condensed hierachy...')
         #select events on bottem level of condensed hierarchy
-        col_event = [col_name for col_name in  self.df.columns if col_name.startswith('Event')][-1]
-
-        df_sum =  self.df[[col_event]].copy()
-        df_sum.columns = ['Event']
-        #add procedure names
-        df_sum['Procedure'] = df_sum['Event'].apply(lambda x: x.procedure)
-        df_sum = df_sum[['Procedure', 'Event']]
-        df_sum.reset_index(drop = True, inplace=True)
-
-        #extract interpolated data for discrete events
-        df_sum['Time'] = df_sum.apply(lambda row: list(row[1].summary(taglist, summary_types, dataserver, calculation_basis, time_type).to_records(index=False)), axis=1)
-
-        df_sum = df_sum.explode('Time') #explode list to rows
-        df_sum['Time'] = df_sum['Time'].apply(lambda x: [el for el in x]) #numpy record to list
-        df_sum[['Tag', 'Summary', 'Value', 'Time']] = df_sum['Time'].apply(pd.Series) #explode list to columns
-        df_sum['Time'] = df_sum['Time'].apply(lambda x: add_timezone(x))
-        df_sum.reset_index(drop = True, inplace=True)
+        col_event = [col_name for col_name in self.df.columns if col_name.startswith('Event')][-1]
         
-        return df_sum
+        #based on list of tags
+        if col == False:
+            df = self.df[[col_event]].copy()
+            df.columns = ['Event']
+            
+            #performance checks
+            maxi = max(df['Event'].apply(lambda x: x.duration))
+            if maxi > pd.Timedelta("60 days"):
+                print(f'Large Event(s) with duration up to {maxi} detected, Note that this might take some time...')
+            if len(df) > 50:
+                print(f'Summaries will be calculated for {len(df)} Events, Note that this might take some time...')
+            
+             #add procedure names
+            df['Procedure'] = df['Event'].apply(lambda x: x.procedure)
+            df = df[['Procedure', 'Event']]
+            df.reset_index(drop = True, inplace=True)
         
+            taglist = convert_to_TagList(tag_list, dataserver)
+            #extract summary data for discrete events
+            df['Time'] = df['Event'].apply(lambda x: list(x.summary(taglist, summary_types, calculation_basis, time_type).to_records(index=False)))
+            
+        #based on column with tags
+        if col == True:
+            if len(tag_list) > 1:
+                raise AttributeError (f'You can only specify a single tag column at a time')
+            if tag_list[0] in self.df.columns:
+                df = self.df[[col_event, tag_list[0]]].copy()
+                df.columns = ['Event', 'Tags']
+            else:
+                raise AttributeError (f'The column option was set to True, but {tag_list} is not a valid column')
+            
+            #performance checks
+            maxi = max(df['Event'].apply(lambda x: x.duration))
+            if maxi > pd.Timedelta("60 days"):
+                print (f'Large Event(s) with duration up to {maxi} detected, Note that this might take some time...')
+            if len(df) > 50:
+                print(f'Summaries will be calculated for {len(df)} Events, Note that this might take some time...')
+                
+            #add procedure names
+            df['Procedure'] = df['Event'].apply(lambda x: x.procedure)
+            df = df[['Procedure', 'Event', 'Tags']]
+            df.reset_index(drop = True, inplace=True)
 
+            event = df.columns.get_loc('Event')
+            tags = df.columns.get_loc('Tags')
+            #extract summary data for discrete events
+            df['Time'] = df.apply(lambda row: list(row[event].summary([row[tags]], summary_types, dataserver, calculation_basis, time_type).to_records(index=False)), axis=1)
+
+        df = df.explode('Time') #explode list to rows
+        df['Time'] = df['Time'].apply(lambda x: [el for el in x]) #numpy record to list
+        df[['Tag', 'Summary', 'Value', 'Time']] = df['Time'].apply(pd.Series) #explode list to columns
+        df['Time'] = df['Time'].apply(lambda x: add_timezone(x))
+        df.reset_index(drop = True, inplace=True)
+        
+        
+        
+        return df
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
 class Asset:
     '''Container for Event object'''
         
@@ -941,7 +1118,7 @@ class AssetHierarchy:
     
     #methods
     def add_attributes(self, attribute_names_list, level):
-        ''''Add attributtes to AssetHierarchy for specified attributes and template/level'''
+        ''''Add attributtes to AssetHierarchy for specified attributes and level'''
         print('Fetching attribute(s)...')
 
         for attribute in attribute_names_list:
@@ -953,31 +1130,33 @@ class AssetHierarchy:
             except:
                 pass
         return self.df
-            
-    
-    def condense(self, level=10):
-        ''''Return condensed dataframe for Asset hierarchy, up to specified template/level'''
+
+    def condense(self):
+        ''''Return condensed dataframe based on Assets in AssetHierarchy'''
         print('Condensing...')
-        if type(level) == str:
-            level = self.df.loc[self.df['Template']==level, 'Level'].iloc[0]
         
-        self.df = self.df[self.df['Level']<=level].copy()
+        df = self.df.copy()
         #merge level by level
-        i=0
-        for level, df_level in self.df.groupby('Level'):
-            #add auxiliary columns for merge based on path
-            cols = [x for x in range(int(level)+1)]
-            df_level[cols] = df_level['Path'].str.split('\\', expand=True).loc[:, 4:]
-            #remove Path columns
-            df_level.drop(['Path'], 1, inplace=True)
-            #rename columns, ignore columns with number names
-            df_level.columns = [col_name + ' [' + str(level) + ']' if not ((type(col_name) == int) or ('[' in col_name)) else col_name for col_name in df_level.columns]
-            #merge with previous level
-            if i == 0:
-                df_condensed = df_level
-                i+=1
+        for level in range(int(df['Level'].min()), int(df['Level'].max()+1)):
+            #subdf per level
+            df_level = df[df['Level'] == level]
+            #remove empty columns
+            df_level.dropna(how='all', axis=1, inplace=True)
+            if df_level.empty:
+                df_condensed[level] = 'TempValue'
             else:
-                df_condensed = pd.merge(df_condensed, df_level, how='right', left_on=cols[:-1], right_on=cols[:-1])
+                #add auxiliary columns for merge based on path
+                cols = [x for x in range(level+1)]
+                df_level[cols] = df_level['Path'].str.split('\\', expand=True).loc[:, 4:]
+                #remove Path columns
+                df_level.drop(['Path'], 1, inplace=True)
+                #rename columns, ignore columns with number names
+                df_level.columns = [col_name + ' [' + str(int(level)) + ']' if not ((type(col_name) == int) or ('[' in col_name)) else col_name for col_name in df_level.columns]
+                #merge with previous level
+                if level == int(df['Level'].min()):
+                    df_condensed = df_level
+                else:
+                    df_condensed = pd.merge(df_condensed, df_level, how='outer', left_on=cols[:-1], right_on=cols[:-1])
         #drop auxiliary columns 
         df_condensed.drop([col_name for col_name in df_condensed.columns if type(col_name) == int], 1, inplace=True)
         #remove duplicates

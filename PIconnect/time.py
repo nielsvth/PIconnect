@@ -26,6 +26,9 @@ def to_af_time_range(start_time, end_time):
         start_time = start_time.isoformat()
     if isinstance(end_time, datetime):
         end_time = end_time.isoformat()
+    if isinstance(end_time, float):
+        local_tz = pytz.timezone(PIConfig.DEFAULT_TIMEZONE)
+        end_time = datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(local_tz).isoformat()
 
     return AF.Time.AFTimeRange(start_time, end_time)
 
@@ -41,6 +44,9 @@ def to_af_time(time):
     """
     if isinstance(time, datetime):
         time = time.isoformat()
+
+    #---NaT floats
+
 
     return AF.Time.AFTime(time)
 
