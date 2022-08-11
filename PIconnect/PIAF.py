@@ -291,9 +291,7 @@ class Event:
         
     def __init__(self, event):
         self.eventframe = event
-        #self.afcontainer = AF.AFNamedCollectionList[AF.EventFrame.AFEventFrame]() #empty container
-        #self.afcontainer.Add(self.eventframe)
-    
+
     def __repr__(self):
         return ('Event:' + self.eventframe.GetPath() )
     
@@ -387,23 +385,26 @@ class Event:
     #Methods
     def plot_values(self, tag_list, nr_of_intervals, dataserver=None):
         '''Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels)
-        Returns a Dictionary of DataFrames for Tags in Taglist with values that will produce the most accurate plot over the time range while minimizing the amount of data returned.'''
+        Returns a Dictionary of DataFrames for tags specified by list of tagnames or Tags within the event,
+        with values that will produce the most accurate plot over the time range while minimizing the amount of data returned.
+        Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and 
+        at most one exceptional point (bad status or digital state).'''
         taglist = convert_to_TagList(tag_list, dataserver)
         return taglist.plot_values(self.starttime, self.endtime, nr_of_intervals)
     
     def interpolated_values(self, tag_list, interval, dataserver=None, filter_expression=''):
-        ''''Return Dataframe of interpolated values for tags specified by list of tagnames or PIPoint, between starttime and endtime'''
+        '''Return Dataframe of interpolated values for tags specified by list of tagnames or Tags, for a defined interval and within the event'''
         taglist = convert_to_TagList(tag_list, dataserver)
         if type(self.endtime) == float:
             local_tz = timezone(PIConfig.DEFAULT_TIMEZONE)
             endtime = datetime.utcnow().replace(tzinfo=utc).astimezone(local_tz)
-            return taglist.interpolated_values(self.starttime, endtime, interval)
-        return taglist.interpolated_values(self.starttime, self.endtime, interval)
+            return taglist.interpolated_values(self.starttime, endtime, interval, filter_expression)
+        return taglist.interpolated_values(self.starttime, self.endtime, interval, filter_expression)
         
     def recorded_values(self, tag_list, dataserver=None, filter_expression='', AFBoundaryType=BoundaryType.INSIDE):
-        ''''Return Dataframe of recorded values for tags specified by list of tagnames or PIPoint, between starttime and endtime'''
+        ''''Return Dataframe of recorded values for tags specified by list of tagnames or Tags, within the event'''
         taglist = convert_to_TagList(tag_list, dataserver)
-        return taglist.recorded_values(self.starttime, self.endtime)
+        return taglist.recorded_values(self.starttime, self.endtime, filter_expression)
 
     def summary(self, tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO):
         '''Return specified summary measure(s) for event
@@ -462,12 +463,15 @@ class Event:
             return attribute_dct
     
     def get_event_hierarchy(self, depth=10): ##### lookup by template instead of number? - Level more constant then templates?
-        '''Return dataframe of event Hierarchy'''
+        '''Return event hierarchy down to the depth specified'''
         df_procedures = pd.DataFrame([(self.eventframe, self.eventframe.GetPath())], columns=['Event', 'Path'])
-
+        
+        afcontainer = AF.AFNamedCollectionList[AF.EventFrame.AFEventFrame]() #empty container
+        afcontainer.Add(self.eventframe)
+        
         print('Fetching hierarchy data for Event...')
         #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_EventFrame_AFEventFrame_LoadEventFramesToDepth.htm
-        event_depth = AF.EventFrame.AFEventFrame.LoadEventFramesToDepth(self.afcontainer, False, depth, 1000000)
+        event_depth = AF.EventFrame.AFEventFrame.LoadEventFramesToDepth(afcontainer, False, depth, 1000000)
 
         if len(event_depth) > 0:
             df_events = pd.DataFrame([(y, y.GetPath()) for y in event_depth], columns=['Event', 'Path'])
@@ -570,7 +574,7 @@ class EventHierarchy:
     
     #Methods
     def add_attributes(self, attribute_names_list, template_name):
-        ''''Add attributtes to EventHierarchy for specified attributes and template/level'''
+        ''''Add attribute values to EventHierarchy for specified attributes, defined for the specified template'''
         print('Fetching attribute(s)...')
         if type(template_name) == int:
             template_name = self.df.loc[self.df['Level']==template_name, 'Template'].iloc[0]
@@ -587,7 +591,7 @@ class EventHierarchy:
             
     def add_ref_elements(self, template_name):
         print('Fetching referenced element(s)...')
-        ''''Add referenced elements to EventHierarchy for specified template/level'''
+        ''''Add referenced element values to EventHierarchy, defined for the specified template'''
         if type(template_name) == int:
             template_name = self.df.loc[self.df['Level']==template_name, 'Template'].iloc[0]
 
@@ -601,7 +605,7 @@ class EventHierarchy:
         return self.df
      
     def condense(self):
-        ''''Return condensed dataframe based on events in EventHierarchy'''
+        ''''Condense the EventHierarchy object to return a condensed, vertically layered representation of the Event Tree'''
         print('Condensing...')
         
         df = self.df.copy()
@@ -644,8 +648,8 @@ class EventHierarchy:
                 
         return df_condensed
     
-    def interpol_discrete_extract(self, tag_list, interval, dataserver=None, col=False):
-        '''Return dataframe of interpolated data for discrete events of EventHierarchy'''
+    def interpol_discrete_extract(self, tag_list, interval, filter_expression='', dataserver=None, col=False):
+        '''Return dataframe of interpolated data for discrete events of EventHierarchy, for the tag(s) specified'''
         print('building discrete extract table from EventHierachy...')
         df = self.df.copy()
         
@@ -659,7 +663,7 @@ class EventHierarchy:
         if col == False:
             taglist = convert_to_TagList(tag_list, dataserver)
             #extract interpolated data for discrete events
-            df['Time'] = df['Event'].apply(lambda x: list(x.interpolated_values(taglist, interval).to_records(index=True)))
+            df['Time'] = df['Event'].apply(lambda x: list(x.interpolated_values(taglist, interval, filter_expression).to_records(index=True)))
         
         if col == True:
             if len(tag_list) > 1:
@@ -668,9 +672,9 @@ class EventHierarchy:
                 event = df.columns.get_loc('Event')
                 tags = df.columns.get_loc(tag_list[0])
                 #extract interpolated data for discrete events
-                df['Time'] = df.apply(lambda row: list(row[event].interpolated_values([row[tags]], interval).to_records(index=True)), axis=1)
+                df['Time'] = df.apply(lambda row: list(row[event].interpolated_values([row[tags]], interval, filter_expression).to_records(index=True)), axis=1)
             else:
-                raise AttributeError (f'The column option was set to True, but {tag_list} is not a valid column')
+                raise AttributeError (f'The column option was set to True, but {tag_list[0]} is not a valid column')
         
         df = df.explode('Time') #explode list to rows
         df['Time'] = df['Time'].apply(lambda x: [el for el in x]) #numpy record to list
@@ -681,7 +685,7 @@ class EventHierarchy:
         return df
 
     def summary_extract(self, tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, col=False):
-        '''Return dataframe of summary measures for discrete events of EventHierarchy'''
+        '''Return dataframe of summary measures for discrete events of EventHierarchy, for the tag(s) specified'''
         print('Building summary table from EventHierachy...')
         df =  self.df.copy()
         
@@ -706,7 +710,7 @@ class EventHierarchy:
                 #extract summary data for discrete events
                 df['Time'] = df.apply(lambda row: list(row[event].summary([row[tags]], summary_types, dataserver, calculation_basis, time_type).to_records(index=False)), axis=1)
             else:
-                raise AttributeError (f'The column option was set to True, but {tag_list} is not a valid column')
+                raise AttributeError (f'The column option was set to True, but {tag_list[0]} is not a valid column')
 
         df = df.explode('Time') #explode list to rows
         df['Time'] = df['Time'].apply(lambda x: [el for el in x]) #numpy record to list
@@ -724,7 +728,7 @@ except AttributeError:
     pass
         
 @pd.api.extensions.register_dataframe_accessor("ecd")    
-class CondensedHierarchy:
+class CondensedEventHierarchy:
     '''Additional functionality for pd.DataFrame object, for working with CondensedHierarchies'''
     
     def __init__(self, df):
@@ -743,8 +747,8 @@ class CondensedHierarchy:
     #Methods
     
     
-    def interpol_discrete_extract(self, tag_list, interval, dataserver=None, col=False):
-        '''Return dataframe of interpolated data for discrete events on bottom level of condensed hierarchy'''
+    def interpol_discrete_extract(self, tag_list, interval, filter_expression='', dataserver=None, col=False):
+        '''Return dataframe of interpolated values for discrete events on bottom level of condensed hierarchy'''
         print('building discrete extract table from condensed hierachy...')
         #select events on bottem level of condensed hierarchy
         col_event = [col_name for col_name in self.df.columns if col_name.startswith('Event')][-1]
@@ -768,7 +772,7 @@ class CondensedHierarchy:
         
             taglist = convert_to_TagList(tag_list, dataserver)
             #extract interpolated data for discrete events
-            df['Time'] = df['Event'].apply(lambda x: list(x.interpolated_values(taglist, interval).to_records(index=True)))
+            df['Time'] = df['Event'].apply(lambda x: list(x.interpolated_values(taglist, interval, filter_expression).to_records(index=True)))
         
         #based on column with tags
         if col == True:
@@ -795,7 +799,7 @@ class CondensedHierarchy:
             event = df.columns.get_loc('Event')
             tags = df.columns.get_loc('Tags')
             #extract interpolated data for discrete events
-            df['Time'] = df.apply(lambda row: list(row[event].interpolated_values([row[tags]], interval, dataserver).to_records(index=True)), axis=1)
+            df['Time'] = df.apply(lambda row: list(row[event].interpolated_values([row[tags]], interval, filter_expression, dataserver).to_records(index=True)), axis=1)
             
             taglist = convert_to_TagList(list(df['Tags'].unique()), dataserver)
 
@@ -808,8 +812,8 @@ class CondensedHierarchy:
         return df
     
 
-    def interpol_continuous_extract(self, tag_list, interval, dataserver=None):
-        '''Return dataframe of continous, interpolated data from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy'''
+    def interpol_continuous_extract(self, tag_list, interval, filter_expression='', dataserver=None):
+        '''Return dataframe of continous, interpolated values from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy'''
         taglist = convert_to_TagList(tag_list, dataserver)
 
         print('building continuous extract table from condensed hierachy...')
@@ -828,7 +832,7 @@ class CondensedHierarchy:
         for proc, df_proc in df_base.groupby('Procedure'):
             starttime = df_proc['Event'].iloc[0].starttime
             endtime = df_proc['Event'].iloc[-1].endtime
-            values = list(taglist.interpolated_values(starttime, endtime, interval).to_records(index=True))
+            values = list(taglist.interpolated_values(starttime, endtime, interval, filter_expression).to_records(index=True))
             df_cont = df_cont.append(pd.DataFrame([[proc, values]], columns=['Procedure', 'Time']), ignore_index=True)
 
         df_cont = df_cont.explode('Time') #explode list to rows
@@ -851,7 +855,7 @@ class CondensedHierarchy:
         return df_cont
 
  
-    def recorded_extract(self, tag_list, dataserver=None):
+    def recorded_extract(self, tag_list, filter_expression='', dataserver=None):
         '''Return nested dictionary (level 1: Procedures, Level 2: Tags) of recorded data extracts from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy'''
         taglist = convert_to_TagList(tag_list, dataserver)
 
@@ -871,7 +875,7 @@ class CondensedHierarchy:
         for proc, df_proc in df_base.groupby('Procedure'):
             starttime = df_proc['Event'].iloc[0].starttime
             endtime = df_proc['Event'].iloc[-1].endtime
-            values = taglist.recorded_values(starttime, endtime)
+            values = taglist.recorded_values(starttime, endtime, filter_expression)
             for tag, df_rec in values.items():
                 #add Event info back
                 df_rec['Event'] = np.nan
@@ -885,7 +889,8 @@ class CondensedHierarchy:
         return dct
     
     def plot_continuous_extract(self, tag_list, nr_of_intervals, dataserver=None):
-        '''Return nested dictionary (level 1: Procedures, Level 2: Tags) of continuous plot data extracts from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy'''
+        '''Return nested dictionary (level 1: Procedures, Level 2: Tags) of continuous plot values from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy.
+        Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and at most one exceptional point (bad status or digital state).'''
         taglist = convert_to_TagList(tag_list, dataserver)
 
         print('building continuous plot extract dict from condensed hierachy...')
@@ -980,21 +985,8 @@ class CondensedHierarchy:
         df[['Tag', 'Summary', 'Value', 'Time']] = df['Time'].apply(pd.Series) #explode list to columns
         df['Time'] = df['Time'].apply(lambda x: add_timezone(x))
         df.reset_index(drop = True, inplace=True)
-        
-        
-        
+
         return df
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         
         
         
@@ -1132,7 +1124,7 @@ class AssetHierarchy:
         return self.df
 
     def condense(self):
-        ''''Return condensed dataframe based on Assets in AssetHierarchy'''
+        ''''condense the AssetHierarchy object to return a condensed, vertically layered representation of the Asset Tree'''
         print('Condensing...')
         
         df = self.df.copy()

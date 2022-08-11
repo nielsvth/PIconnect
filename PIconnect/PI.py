@@ -163,8 +163,8 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
         """
         return self.connection.Name
 
-    def search(self, query, source=None):
-        """search
+    def find_tags(self, query, source=None):
+        """find_tags
 
         Search PIPoints on the PIServer
 
@@ -180,15 +180,15 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
             Reject searches while not connected
         """
         if isinstance(query, list):
-            return TagList([y for x in query for y in self.search(x, source)])
+            return TagList([y for x in query for y in self.find_tags(x, source)])
         elif not isinstance(query, str):
              raise TypeError('Argument query must be either a string or a list of strings,' +
                              'got type ' + str(type(query)))
         return TagList([Tag(pi_point)for pi_point in AF.PI.PIPoint.FindPIPoints(self.connection, BuiltinStr(query), source, None)])
         
-    def get_tags(self, query):
-        """Returns dataframe containing Tag object, tag name, description and UOM for each tag that meets the restrictions specified in the query"""
-        tags = self.search(str(query))
+    def tag_overview(self, query):
+        """Returns dataframe containing overview of Tag object, tag name, description and UOM for each tag that meets the restrictions specified in the query"""
+        tags = self.find_tags(str(query))
         
         df = pd.DataFrame()
         df['Tag'] = [tag for tag in tags]
@@ -196,7 +196,7 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
         #df['Tag'].apply(lambda x: x.LoadAttributes(['descriptor', 'engunits']))
         df['Name'] = df['Tag'].apply(lambda x: x.name)
         df['Description'] = df['Tag'].apply(lambda x: x.description)
-        df['UOM'] = df['Tag'].apply(lambda x: x.units_of_measurement)
+        df['UOM'] = df['Tag'].apply(lambda x: x.uom)
         #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_PI_PIPointType.htm
         df['PointType'] = df['Tag'].apply(lambda x: x.pointtype)
         df['PointType_desc'] = df['Tag'].apply(lambda x: x.pointtype_desc)
@@ -231,56 +231,47 @@ class Tag:
     @property
     def name(self):
         return self.tag.Name
-    
     @property
     def pipoint(self):
         return self.tag
-    
     @property
     def server(self):
         return PIServer(self.tag.Server.Name)
-    
     @property
     def raw_attributes(self):
-        """Return a dictionary of the raw attributes of the PI Point."""
+        """Return a dictionary of the raw attributes of the Tag."""
         self.__load_attributes()
         return {att.Key: att.Value for att in self.tag.GetAttributes([])}
-    
     @property
     def last_update(self):
-        """Return the time at which the last value for this PI Point was recorded."""
+        """Return the time at which the last value for this Tag was recorded."""
         return timestamp_to_index(self.tag.CurrentValue().Timestamp.UtcTime)
-
     @property
-    def units_of_measurement(self):
-        """Return the units of measument in which values for this PI Point are reported."""
+    def uom(self):
+        """Return the units of measument in which values for this Tag are reported."""
         return self.raw_attributes["engunits"]
-
     @property
     def description(self):
-        """Return the description of the PI Point."""
+        """Return the description of the Tag."""
         return self.raw_attributes["descriptor"]
-
     @property
     def created(self):
-        """Return the creation datetime of a point."""
-        return timestamp_to_index(self.raw_attributes["creationdate"])
-    
+        """Return the creation datetime of a Tag."""
+        return timestamp_to_index(self.raw_attributes["creationdate"])    
     @property
     def pointtype(self):
-        return self.tag.PointType
-    
+        return self.tag.PointType   
     @property
     def pointtype_desc(self):
         return str(PIPointType(self.pointtype))
 
     #Methods
     def current_value(self):
-        """Return the last recorded value for this PI Point (internal use only)."""
+        """Return the last recorded value for this Tag"""
         return self.tag.CurrentValue().Value
     
     def interpolated_values(self, starttime, endtime, interval, filter_expression=''):
-        ''''Return Dataframe of interpolated values for Tag, between starttime and endtime'''
+        ''''Return Dataframe of interpolated values at specified interval for Tag, between starttime and endtime'''
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         AFTimeRange = to_af_time_range(starttime, endtime)
         filter_expression = filter_expression.replace("%tag%", self.name)
@@ -311,7 +302,7 @@ class Tag:
         #Could have issues with quering multiple PI Data Archives simultanously, see documentation
         #maximum number of events that can be returned with a single call. As of PI 3.4.380, the default is set at 1.5M
         #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_RecordedValues.htm
-        result = self.tag.RecordedValues(AFTimeRange, AFBoundaryType, '', False)
+        result = self.tag.RecordedValues(AFTimeRange, AFBoundaryType, filter_expression, False)
         
         if result:
             #process query results
@@ -328,7 +319,9 @@ class Tag:
     
     def plot_values(self, starttime, endtime, nr_of_intervals):
         '''Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels)
-        Returns a Dataframe with values that will produce the most accurate plot over the time range while minimizing the amount of data returned.'''
+        Returns a Dataframe with values that will produce the most accurate plot over the time range while minimizing the amount of data returned.
+        Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and 
+        at most one exceptional point (bad status or digital state).'''
         AFTimeRange = to_af_time_range(starttime, endtime)
 
         result = self.tag.PlotValues(AFTimeRange, nr_of_intervals)
@@ -349,7 +342,7 @@ class Tag:
     
     #CalculationBasis.EVENT_WEIGHTED avoids issues(?) with interpolation: ref. #Issue 1
     def summary(self, starttime, endtime, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO):
-        '''Return specified summary measure(s) for event
+        '''Return specified summary measure(s) for Tag within the specified timeframe 
         
         Summary_types are defined as integers separated by '|'
         fe: to extract min and max >> event.summary(['tag_x'], dataserver, 4|8) 
@@ -385,7 +378,7 @@ class Tag:
 
 
     def summaries(self, starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO):
-        '''Return one or more summary values for each interval within a time range'''
+        '''Return one or more summary values for each interval for a Tag, within a specified timeframe'''
         AFTimeRange = to_af_time_range(starttime, endtime)
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         
@@ -408,7 +401,7 @@ class Tag:
                            AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, 
                            filter_interval=None):       
         
-        '''Return one or more summary values for each interval within a filtered time range'''
+        '''Return one or more summary values for each interval for a Tag, within a specified timeframe, for values that meet the specified filter condition'''
         AFTimeRange = to_af_time_range(starttime, endtime)
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         filter_expression = filter_expression.replace("%tag%", self.name)
@@ -499,7 +492,7 @@ class TagList(UserList):
         
         #Could have issues with quering multiple PI Data Archives simultanously, see documentation
         #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_InterpolatedValues.htm
-        result = PIPointlist.InterpolatedValues(AFTimeRange, AFInterval, '', False, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))
+        result = PIPointlist.InterpolatedValues(AFTimeRange, AFInterval, filter_expression, False, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))
         
         if result:
             #process query results
@@ -523,7 +516,7 @@ class TagList(UserList):
         #Could have issues with quering multiple PI Data Archives simultanously, see documentation
         #maximum number of events that can be returned with a single call. As of PI 3.4.380, the default is set at 1.5M
         #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_RecordedValues.htm
-        result = PIPointlist.RecordedValues(AFTimeRange, AFBoundaryType, '', False, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))
+        result = PIPointlist.RecordedValues(AFTimeRange, AFBoundaryType, filter_expression, False, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))
         
         if result:
             #process query results
@@ -666,7 +659,7 @@ def convert_to_TagList(tag_list, dataserver=None):
             return TagList(tag_list)
         except:
             if dataserver:
-                 return dataserver.search(tag_list)
+                 return dataserver.find_tags(tag_list)
             else:
                  raise AttributeError('Please specifiy a dataserver when using tags in string format')
 
