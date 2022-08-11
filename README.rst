@@ -92,6 +92,8 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
     #Make afhierarchy visible in variable explorer (string & float representation)
     viewable = JanssenPI.PI.view(afhierarchy)
     
+    #For accessing AssetHierarchy methods, use accessor("ahy") -----
+    
     #Condense the AssetHierarchy object to return a condensed, vertically layered representation of the Asset Tree
     afhierarchy_condensed = afhierarchy.ahy.condense()
     
@@ -228,6 +230,8 @@ The CondensedEventHierarchy object provides a dataframe-like representation of t
     #Use Pandas dataframe methods to filter out events of interest
     df_cond = condensed[(condensed['B_PH_INFO [Phase]'] >= 30010) & (condensed['B_PH_INFO [Phase]'] <= 30020)]
     
+    #For accessing EventHierarchy methods, use accessor("ecd") -----
+    
     #Return dataframe of interpolated values for discrete events on bottom level of condensed hierarchy
     disc_interpol_values = df_cond.ecd.interpol_discrete_extract(tag_list=['100_091_R014_TT04A', '100_091_R014_ST01'], interval='1m', dataserver=server)
     
@@ -303,8 +307,42 @@ For example, a Tag might store the flow rate from a meter, a controller's mode o
 9. TagList
 *******************************************************
 
-bulk
+The TagList class provides a list-like object that contains Tag objects.
 
+It is recommened to use the Taglist methods when collecting data for multiple Tags at once, as opposed to making calls for each Tags separately, as the performance for bulk calls will be superior. 
+
+.. code-block:: python
+
+    #Returns TagList with tags that meet the query criteria
+    taglist = server.find_tags('*091_R019_TT0*') 
+    
+    #Return the last recorded value for a Tag
+    current_value = taglist.current_value()
+    
+    #Return interpolated values at the specified interval for Tag, between starttime and endtime
+    interpol_values = taglist.interpolated_values(starttime='*-20d', endtime='*-10d', interval='1m')
+    
+    #Return recorded values for Tag, between starttime and endtime
+    recorded_values = taglist.recorded_values(starttime='*-5d', endtime='*-2d')
+    #Optionally, specify a filter condition
+    recorded_values = taglist.recorded_values(starttime='18/08/2021', endtime='19/08/2021', filter_expression="'100_091_R019_TT01A' > 20")
+    
+    #Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels)
+    #Returns a Dataframe with values that will produce the most accurate plot over the time range while minimizing the amount of data returned
+    #Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and at most one exceptional point (bad status or digital state).
+    plot_values = taglist.plot_values(starttime='*-20d', endtime='*-10d', nr_of_intervals=10)
+    
+    #Return specified summary measure(s) for Tag within defined timeframe
+    summary_values = taglist.summary(starttime='*-20d', endtime='*-10d',  summary_types=2|4|8)
+    
+    #Return one or more summary values for each interval for a Tag, within a specified timeframe
+    summaries_values = taglist.summaries(starttime='*-20d', endtime='*-10d', interval='1d', summary_types=2|4|8)
+    
+    #Return one or more summary values for each interval for a Tag, within a specified timeframe, for values that meet the specified filter condition
+    filtered_summaries_values = taglist.filtered_summaries(starttime='*-20d', endtime='*-10d', interval='1d', summary_types=2|4|8, filter_expression="'100_091_R019_TT04A' > 20")
+   
+    
+   
 
 
 Copyright notice
