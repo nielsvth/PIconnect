@@ -1,4 +1,4 @@
-""" PIconnect
+""" JanssenPI
     Connector to the OSISoft PI and PI-AF databases.
 """
 # pragma pylint: disable=unused-import

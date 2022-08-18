@@ -58,7 +58,7 @@ def timestamp_to_index(timestamp):
         timestamp (`System.DateTime`): Timestamp in .NET format to convert to `datetime`.
 
     Returns:
-        `datetime`: Datetime with the timezone info from :data:`PIConfig.DEFAULT_TIMEZONE <PIconnect.config.PIConfigContainer.DEFAULT_TIMEZONE>`.
+        `datetime`: Datetime with the timezone info from :data:`PIConfig.DEFAULT_TIMEZONE <JanssenPI.config.PIConfigContainer.DEFAULT_TIMEZONE>`.
     """ 
     try: #issue of converting infite endtimes, now defaulted to timezone unaware infinite timezone
         if datetime(timestamp.Year,

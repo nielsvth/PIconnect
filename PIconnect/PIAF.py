@@ -161,11 +161,11 @@ class PIAFDatabase(object):
 
     @property
     def children(self):
-        """Return a dictionary of the direct child elements of the database."""
+        """Return dictionary of the direct child elements of the database"""
         return {c.Name: c for c in self.database.Elements}
 
     def descendant(self, path):
-        """Return a descendant of the database from an exact path."""
+        """Return a descendant of the database from an exact path"""
         return PIAFElement(self.database.Elements.get_Item(path))
     
     #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_EventFrame_AFEventFrame_FindEventFrames_1.htm
@@ -186,7 +186,7 @@ class PIAFDatabase(object):
         search_full_hierarchy=True,
         sortField=SortField.STARTTIME,
         sortOrder=SortOrder.ASCENDING):
-        '''Return a EventList of Events the meet query'''
+        '''Return a EventList of Events that meet query criteria'''
         
         if template_name:
             try:
@@ -235,8 +235,8 @@ class PIAFDatabase(object):
                 search_full_hierarchy = True, 
                 sortField = SortField.STARTTIME, 
                 sortOrder = SortOrder.ASCENDING, 
-                Int32 = 10000000):
-        '''Return list of Assets that meet query'''
+                max_count = 10000000):
+        '''Return list of Assets that meet query criteria'''
         
         lst = AF.Asset.AFElement.FindElements(self.database, 
                                               top_asset, 
@@ -245,11 +245,13 @@ class PIAFDatabase(object):
                                               search_full_hierarchy, 
                                               sortField, 
                                               sortOrder, 
-                                              Int32)
+                                              max_count)
         return [Asset(x) for x in lst]
 
     def all_assets(self, af_asset_list=[], depth=10):
-        '''return dataframe with hierarchical AF Asset structure'''
+        '''Return AssetHierarchy object'''
+        
+        ##'''"**.get_asset_hierarchy(af_asset_list=[], depth=10)**", "*Method*", "Return AssetHierarchy object for specified Assets"''' ------------------------------------------ > make part of asset class
         
         #None of these https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFElement.htm FindElements methods works
         #use AFDatabase.children to select starting element(s) of interest
@@ -280,9 +282,9 @@ class PIAFDatabase(object):
             df_assets['Template'] = df_assets['Asset'].apply(lambda x: x.template_name if x else np.nan)
             df_assets['Level'] = df_assets['Path'].str.count(r'\\').apply(lambda x: x-4)
             #print('This Asset Frame has structure of "\\\\Server\\Database\\{}"'.format('\\'.join([str(el) for el in df_assets['Template'].unique()])))
-            return df_assets
+            return AssetHierarchy(df_assets) 
         else:
-            return pd.DataFrame(columns=['Asset', 'Path', 'Name', 'Template', 'Level']) 
+            return AssetHierarchy(pd.DataFrame(columns=['Asset', 'Path', 'Name', 'Template', 'Level'])) 
     
     
     
@@ -313,7 +315,7 @@ class Event:
         return self.eventframe.PISystem.Name
     @property
     def database_name(self):
-        '''Return database name'''
+        '''Return connected database name'''
         return self.eventframe.Database.Name
     @property
     def database(self):
@@ -333,19 +335,19 @@ class Event:
         return self.eventframe.Template.Name 
     @property
     def starttime(self):
-        '''Return starttime of event'''
+        '''Return starttime'''
         return timestamp_to_index(self.eventframe.StartTime.UtcTime)
     @property
     def endtime(self):
-        '''Return starttime of event'''
+        '''Return endtime'''
         return timestamp_to_index(self.eventframe.EndTime.UtcTime)
     @property
     def af_timerange(self):
-        '''Return AFTimerange for event'''
+        '''Return AFTimerange'''
         return self.eventframe.TimeRange
     @property
     def attributes(self):
-        ''''Return list of attribute names for event'''
+        ''''Return list of attribute names'''
         return [attribute.Name for attribute in self.eventframe.Attributes]
     @property
     def af_attributes(self):
@@ -357,19 +359,19 @@ class Event:
         return [ref_el.Name for ref_el in self.eventframe.ReferencedElements]
     @property
     def children(self):
-        '''Return EventList of children for event'''
+        '''Return EventList of children'''
         return EventList([Event(event) for event in self.eventframe.EventFrames])
     @property
     def parent(self):
-        '''Return parent event for event'''
+        '''Return parent event'''
         return Event(self.eventframe.Parent)
     @property
     def description(self):
-        '''Return description for event'''
+        '''Return description'''
         return self.eventframe.Description
     @property
     def duration(self):
-        '''Return duration of event as datetime.timedelta object'''
+        '''Return duration as datetime.timedelta object'''
         try:
             return self.endtime - self.starttime
         except: #NaT endtime
@@ -378,8 +380,8 @@ class Event:
             return (datetime.utcnow().replace(tzinfo=utc).astimezone(local_tz) - self.starttime)
          
     @property
-    def procedure(self):
-        '''Return top-level procedure name for this event'''
+    def top_event(self):
+        '''Return top-level event name'''
         return self.path.strip('\\').split('\\')[2]
     
     #Methods
@@ -388,12 +390,12 @@ class Event:
         Returns a Dictionary of DataFrames for tags specified by list of tagnames or Tags within the event,
         with values that will produce the most accurate plot over the time range while minimizing the amount of data returned.
         Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and 
-        at most one exceptional point (bad status or digital state).'''
+        at most one exceptional point (bad status or digital state)'''
         taglist = convert_to_TagList(tag_list, dataserver)
         return taglist.plot_values(self.starttime, self.endtime, nr_of_intervals)
     
     def interpolated_values(self, tag_list, interval, dataserver=None, filter_expression=''):
-        '''Return Dataframe of interpolated values for tags specified by list of tagnames or Tags, for a defined interval and within the event'''
+        '''Return Dataframe of interpolated values for tags specified by list of tagnames or Tags, for a defined interval within the event'''
         taglist = convert_to_TagList(tag_list, dataserver)
         if type(self.endtime) == float:
             local_tz = timezone(PIConfig.DEFAULT_TIMEZONE)
@@ -432,7 +434,7 @@ class Event:
     
     #summaries
     def summaries(self, tag_list, interval, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO):
-        '''Return one or more summary values for Tags in Taglist, for each interval within the specified event duration'''
+        '''Return one or more summary values for Tags in Taglist, for each interval'''
         taglist = convert_to_TagList(tag_list, dataserver)
         return taglist.summaries(self.starttime, self.endtime, interval, summary_types, calculation_basis, time_type)
         
@@ -444,7 +446,7 @@ class Event:
                            time_type=TimestampCalculation.AUTO, 
                            AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, 
                            filter_interval=None):
-        '''Return one or more summary values for Tags in Taglist, (Optional: for each interval) within event duration'''
+        '''Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet the filter criteria'''
         taglist = convert_to_TagList(tag_list, dataserver)
         return taglist.filtered_summaries(self.starttime, self.endtime, interval,summary_types, filter_expression,
                                           calculation_basis, time_type, AFfilter_evaluation, filter_interval)
@@ -463,7 +465,7 @@ class Event:
             return attribute_dct
     
     def get_event_hierarchy(self, depth=10): ##### lookup by template instead of number? - Level more constant then templates?
-        '''Return event hierarchy down to the depth specified'''
+        '''Return EventHierarchy down to the specified depth'''
         df_procedures = pd.DataFrame([(self.eventframe, self.eventframe.GetPath())], columns=['Event', 'Path'])
         
         afcontainer = AF.AFNamedCollectionList[AF.EventFrame.AFEventFrame]() #empty container
@@ -508,11 +510,11 @@ class EventList(UserList):
 
     #Methods
     def to_set(self):
-        '''Return eventlist as list'''
+        '''Return eventlist as set'''
         return set(self.data)
        
     def get_event_hierarchy(self, depth=10):
-        '''Return dataframe of event Hierarchy'''
+        '''Return EventHierarchy down to the specified depth'''
         #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_AFNamedCollectionList_1.htm
         afcontainer = AF.AFNamedCollectionList[AF.EventFrame.AFEventFrame]() #empty container
         for event in self.data:
@@ -605,7 +607,7 @@ class EventHierarchy:
         return self.df
      
     def condense(self):
-        ''''Condense the EventHierarchy object to return a condensed, vertically layered representation of the Event Tree'''
+        ''''Condense the EventHierarchy object to return a vertically layered CondensedEventHierarchy object'''
         print('Condensing...')
         
         df = self.df.copy()
@@ -745,8 +747,7 @@ class CondensedEventHierarchy:
                 raise AttributeError("This dataframe does not have the correct EventHierarchy format") 
 
     #Methods
-    
-    
+ 
     def interpol_discrete_extract(self, tag_list, interval, filter_expression='', dataserver=None, col=False):
         '''Return dataframe of interpolated values for discrete events on bottom level of condensed hierarchy'''
         print('building discrete extract table from condensed hierachy...')
@@ -813,7 +814,7 @@ class CondensedEventHierarchy:
     
 
     def interpol_continuous_extract(self, tag_list, interval, filter_expression='', dataserver=None):
-        '''Return dataframe of continous, interpolated values from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy'''
+        '''Return dataframe of continous, interpolated values from the start of the first filtered event to the end of the last filtered event, for each procedure, on bottom level of condensed hierarchy'''
         taglist = convert_to_TagList(tag_list, dataserver)
 
         print('building continuous extract table from condensed hierachy...')
@@ -855,8 +856,8 @@ class CondensedEventHierarchy:
         return df_cont
 
  
-    def recorded_extract(self, tag_list, filter_expression='', dataserver=None):
-        '''Return nested dictionary (level 1: Procedures, Level 2: Tags) of recorded data extracts from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy'''
+    def recorded_extract(self, tag_list, filter_expression='', AFBoundaryType=BoundaryType.INTERPOLATED, dataserver=None):
+        '''Return nested dictionary (level 1: Procedures, Level 2: Tags) of recorded data extracts from the start of the first filtered event to the end of the last filtered event, for each procedure, on bottom level of condensed hierarchy'''
         taglist = convert_to_TagList(tag_list, dataserver)
 
         print('building recorded extract dict from condensed hierachy...')
@@ -875,7 +876,7 @@ class CondensedEventHierarchy:
         for proc, df_proc in df_base.groupby('Procedure'):
             starttime = df_proc['Event'].iloc[0].starttime
             endtime = df_proc['Event'].iloc[-1].endtime
-            values = taglist.recorded_values(starttime, endtime, filter_expression)
+            values = taglist.recorded_values(starttime, endtime, filter_expression, AFBoundaryType=BoundaryType.INTERPOLATED)
             for tag, df_rec in values.items():
                 #add Event info back
                 df_rec['Event'] = np.nan
@@ -890,7 +891,7 @@ class CondensedEventHierarchy:
     
     def plot_continuous_extract(self, tag_list, nr_of_intervals, dataserver=None):
         '''Return nested dictionary (level 1: Procedures, Level 2: Tags) of continuous plot values from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy.
-        Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and at most one exceptional point (bad status or digital state).'''
+        Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and at most one exceptional point (bad status or digital state)'''
         taglist = convert_to_TagList(tag_list, dataserver)
 
         print('building continuous plot extract dict from condensed hierachy...')
@@ -926,7 +927,7 @@ class CondensedEventHierarchy:
     #option to specify column with tagnames to refer to instead of taglist? -----------------
     
     def summary_extract(self, tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, col=False):
-        '''Return dataframe of summary data for events on bottom level of condensed hierarchy'''
+        '''Return dataframe of summary values for events on bottom level of condensed hierarchy'''
  
         print('building discrete extract table from condensed hierachy...')
         #select events on bottem level of condensed hierarchy
@@ -1083,7 +1084,7 @@ class Asset:
                    search_full_hierarchy=True,
                    sortField=SortField.STARTTIME,
                    sortOrder=SortOrder.ASCENDING):
-        '''Return EventList of Events on Asset within specified time period'''
+        '''Return EventList of Events on Asset within specified time period that meets the query criteria'''
         asset=self.name
         return self.database.find_events(query, asset, start_time, end_time, template_name, start_index, max_count, search_mode, search_full_hierarchy, sortField, sortOrder)
 
@@ -1095,7 +1096,7 @@ except AttributeError:
 
 @pd.api.extensions.register_dataframe_accessor("ahy")
 class AssetHierarchy:
-    '''Additional functionality for pd.DataFrame object, for working with EventHierarchies'''
+    '''Additional functionality for pd.DataFrame object, for working with AssetHierarchies'''
     
     def __init__(self, df):
         self.validate(df)
@@ -1124,7 +1125,7 @@ class AssetHierarchy:
         return self.df
 
     def condense(self):
-        ''''condense the AssetHierarchy object to return a condensed, vertically layered representation of the Asset Tree'''
+        ''''Condense the AssetHierarchy object to return a condensed, vertically layered representation of the Asset Tree'''
         print('Condensing...')
         
         df = self.df.copy()

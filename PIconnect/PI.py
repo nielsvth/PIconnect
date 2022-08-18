@@ -162,7 +162,8 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
         Name of the connected server
         """
         return self.connection.Name
-
+    
+    #methods
     def find_tags(self, query, source=None):
         """find_tags
 
@@ -173,7 +174,7 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
             source (str, optional): Defaults to None. Point source to limit the results
 
         Returns:
-            list: A list of :class:`PIPoint` objects as a result of the query
+            list: A list of Tag objects as a result of the query
 
         .. todo::
 
@@ -230,48 +231,54 @@ class Tag:
     #Properties
     @property
     def name(self):
+        '''Return name of Tag'''
         return self.tag.Name
     @property
     def pipoint(self):
+        '''Return '''
         return self.tag
     @property
     def server(self):
+        '''Return connected server'''
         return PIServer(self.tag.Server.Name)
     @property
     def raw_attributes(self):
-        """Return a dictionary of the raw attributes of the Tag."""
+        """Return dictionary of the raw attributes"""
         self.__load_attributes()
         return {att.Key: att.Value for att in self.tag.GetAttributes([])}
     @property
     def last_update(self):
-        """Return the time at which the last value for this Tag was recorded."""
+        """Return datetime at which the last value was recorded"""
         return timestamp_to_index(self.tag.CurrentValue().Timestamp.UtcTime)
     @property
     def uom(self):
-        """Return the units of measument in which values for this Tag are reported."""
+        """Return units of measument"""
         return self.raw_attributes["engunits"]
     @property
     def description(self):
-        """Return the description of the Tag."""
+        """Return description"""
         return self.raw_attributes["descriptor"]
     @property
     def created(self):
-        """Return the creation datetime of a Tag."""
+        """Return the creation datetime"""
         return timestamp_to_index(self.raw_attributes["creationdate"])    
     @property
     def pointtype(self):
+        '''Return an integer value corresponding to the pointtype
+        ref: https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_PI_PIPointType.htm'''
         return self.tag.PointType   
     @property
     def pointtype_desc(self):
+        '''Return the pointtype'''
         return str(PIPointType(self.pointtype))
 
     #Methods
     def current_value(self):
-        """Return the last recorded value for this Tag"""
+        """Return last recorded value"""
         return self.tag.CurrentValue().Value
     
     def interpolated_values(self, starttime, endtime, interval, filter_expression=''):
-        ''''Return Dataframe of interpolated values at specified interval for Tag, between starttime and endtime'''
+        ''''Return Dataframe of interpolated values at specified interval, between starttime and endtime'''
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         AFTimeRange = to_af_time_range(starttime, endtime)
         filter_expression = filter_expression.replace("%tag%", self.name)
@@ -295,7 +302,7 @@ class Tag:
 
 
     def recorded_values(self, starttime, endtime, filter_expression='', AFBoundaryType=BoundaryType.INTERPOLATED):
-        ''''Return Dataframe of recorded values for Tag, between starttime and endtime'''
+        ''''Return Dataframe of recorded values, between starttime and endtime'''
         AFTimeRange = to_af_time_range(starttime, endtime)
         filter_expression = filter_expression.replace("%tag%", self.name)
 
@@ -321,7 +328,7 @@ class Tag:
         '''Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels)
         Returns a Dataframe with values that will produce the most accurate plot over the time range while minimizing the amount of data returned.
         Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and 
-        at most one exceptional point (bad status or digital state).'''
+        at most one exceptional point (bad status or digital state)'''
         AFTimeRange = to_af_time_range(starttime, endtime)
 
         result = self.tag.PlotValues(AFTimeRange, nr_of_intervals)
@@ -378,7 +385,7 @@ class Tag:
 
 
     def summaries(self, starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO):
-        '''Return one or more summary values for each interval for a Tag, within a specified timeframe'''
+        '''Return one or more summary values for each interval, within a specified timeframe'''
         AFTimeRange = to_af_time_range(starttime, endtime)
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         
@@ -401,7 +408,7 @@ class Tag:
                            AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, 
                            filter_interval=None):       
         
-        '''Return one or more summary values for each interval for a Tag, within a specified timeframe, for values that meet the specified filter condition'''
+        '''Return one or more summary values for each interval, within a specified timeframe, for values that meet the specified filter condition'''
         AFTimeRange = to_af_time_range(starttime, endtime)
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         filter_expression = filter_expression.replace("%tag%", self.name)
@@ -446,7 +453,7 @@ class TagList(UserList):
         except:
             raise AttributeError('Can not convert this type of input to TagList object')
     
-    def current_value(self):
+    def current_values(self):
         '''Return Dataframe of current values per tag'''
         PIPointlist = generate_pipointlist(self)
         result = PIPointlist.CurrentValue()
@@ -459,7 +466,7 @@ class TagList(UserList):
     
     def plot_values(self, starttime, endtime, nr_of_intervals):
         '''Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels)
-        Returns a Dictionary of DataFrames for Tags in Taglist with values that will produce the most accurate plot over the time range while minimizing the amount of data returned.'''
+        Returns a Dictionary of DataFrames for Tags in Taglist with values that will produce the most accurate plot over the time range while minimizing the amount of data returned'''
         AFTimeRange = to_af_time_range(starttime, endtime)
         PIPointlist = generate_pipointlist(self)
 
@@ -611,7 +618,7 @@ class TagList(UserList):
                            AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, 
                            filter_interval=None):       
         
-        '''Return one or more summary values for Tags in Taglist, (Optional: for each interval) within a filtered time range'''
+        '''Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet the filter criteria'''
         PIPointlist = generate_pipointlist(self)
         AFTimeRange = to_af_time_range(starttime, endtime)
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
