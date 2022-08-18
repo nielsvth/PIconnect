@@ -135,7 +135,7 @@ An event frame encapsulates the time period of the event and links it to assets 
     #Optionally, specify a filter condition
     interpol_values = event.interpolated_values(tag_list=['100_091_R014_TT04A'], interval='1m', filter_expression="'100_091_R019_TT04A' > 20", dataserver=server)
     
-    #Return Dataframe of recorded values for tags specified by list of tagnames (100_091_R014_TT04A) or Tags, within within the event
+    #Return Dataframe of recorded values for tags specified by list of tagnames (100_091_R014_TT04A) or Tags, within the event
     recorded_values = event.recorded_values(tag_list=['100_091_R014_TT04A'], dataserver=server)
     
     #Return specified summary measure(s) for tags specified by list of tagnames (100_091_R014_TT04A) or Tags within the event
@@ -344,7 +344,7 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
     filtered_summaries_values = taglist.filtered_summaries(starttime='*-20d', endtime='*-10d', interval='1d', summary_types=2|4|8, filter_expression="'100_091_R019_TT04A' > 20")
    
 
-10. Overview
+10. Attribute & Method Overview
 *******************************************************
 
 .. csv-table:: PIServer
@@ -548,6 +548,37 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
    "**.condense**
    ()", "*Method*", "Condense the AssetHierarchy object to return a condensed, vertically layered representation of the Asset Tree"
 
+
+10. PIConstants
+*******************************************************
+PIConstants provides a defined set of arguments that can be passed to some of the class methods specified above to modify their behaviour. 
+They are imported from the PIConsts module and used as illustrated in the example below. 
+
+.. code-block:: python
+
+    import PIconnect
+
+    #Initiate connection to PI data server & PI AF database of interest by defining their name
+    with PIconnect.PIAFDatabase(server=afservers[0], database=afdatabases[0]) as afdatabase, PIconnect.PIServer(server=dataservers[0]) as server:
+        
+        #Return Dataframe of recorded values for tags specified by list of tagnames (100_091_R014_TT04A) or Tags, within the event
+        recorded_values = event.recorded_values(tag_list=['100_091_R014_TT04A'], dataserver=server, AFBoundaryType=BoundaryType.INSIDE)
+        
+        #Now let's change the AFBoundaryType argument to INTERPOLATED
+        #Class BoundaryType has following options:
+            #Return the recorded values on the inside of the requested time range as the first and last values.
+            #INSIDE = 0
+            #Return the recorded values on the outside of the requested time range as the first and last values.
+            #OUTSIDE = 1
+            #Create an interpolated value at the end points of the requested time range if a recorded value does not exist at that time.
+            #INTERPOLATED = 2
+            
+        #import right class from PIConsts
+        from PIConsts import BoundaryType
+        
+        #lets set BoundaryType to BoundaryType.INTERPOLATED
+        recorded_values = event.recorded_values(tag_list=['100_091_R014_TT04A'], dataserver=server, AFBoundaryType=BoundaryType.INTERPOLATED)
+    
 
 Copyright notice
 ================
