@@ -549,7 +549,7 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
    ()", "*Method*", "Condense the AssetHierarchy object to return a condensed, vertically layered representation of the Asset Tree"
 
 
-10. PIConstants
+11. PIConstants
 *******************************************************
 PIConstants provides a defined set of arguments that can be passed to some of the class methods specified above to modify their behaviour. 
 They are imported from the PIConsts module and used as illustrated in the example below. 
