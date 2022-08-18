@@ -1,15 +1,15 @@
 #########
-JanssenPI
+PIconnect
 #########
 
 A Python connector to the OSISoft PI AF SDK
 ========================================================
 
-JanssenPI provides a programmatic interface in Python to the OSISoft PI AF SDK. 
-JanssenPI is a package which was built upon the PIconnect package to include additional functionality for working with Assets and (hierarchical) EventFrames.
+PIconnect provides a programmatic interface in Python to the OSISoft PI AF SDK. 
+This package is a branch which was built upon the PIconnect package to include additional functionality for working with Assets and (hierarchical) EventFrames.
 It also provides added functionality for executing bulk queries. 
 
-The basic introduction to working with the JanssenPI package is covered in the Tutorial below.
+The basic introduction to working with the PIconnect package is covered in the Tutorial below.
 
 * Free software: MIT license
 
@@ -21,26 +21,28 @@ Tutorial
 
 .. code-block:: python
 
-    import JanssenPI
+    import PIconnect
     
     #set up timezone
     #Pick timezone from https://gist.github.com/heyalexej/8bf688fd67d7199be4a1682b3eec7568
-    JanssenPI.PIConfig.DEFAULT_TIMEZONE = 'Europe/Brussels'
+    PIconnect.PIConfig.DEFAULT_TIMEZONE = 'Europe/Brussels'
 
     #List of available PI data servers
-    dataservers = list(JanssenPI.PIServer.servers.keys())
+    #PI Servers are used for accessing Tag (pipoint) data
+    dataservers = list(PIconnect.PIServer.servers.keys())
     print(dataservers)
 
     #List of available PI AF servers
-    afservers = list(JanssenPI.PIAFDatabase.servers.keys())
+    # AF servers are used for accessing Event and Asset objects
+    afservers = list(PIconnect.PIAFDatabase.servers.keys())
     print(afservers)
 
     #List of available PI AF databases for first AF server in afservers list
-    afdatabases = list(JanssenPI.PIAFDatabase.servers[afservers[0]]['databases'].keys())
+    afdatabases = list(PIconnect.PIAFDatabase.servers[afservers[0]]['databases'].keys())
     print(afdatabases)
 
     #Initiate connection to PI data server & PI AF database of interest by defining their name
-    with JanssenPI.PIAFDatabase(server=afservers[0], database=afdatabases[0]) as afdatabase, JanssenPI.PIServer(server=dataservers[0]) as server:
+    with PIconnect.PIAFDatabase(server=afservers[0], database=afdatabases[0]) as afdatabase, PIconnect.PIServer(server=dataservers[0]) as server:
 
         #print name of specified server
         print(server.server_name)
@@ -90,7 +92,7 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
     afhierarchy = afdatabase.all_assets(depth=10)
     
     #Make afhierarchy visible in variable explorer (string & float representation)
-    viewable = JanssenPI.PI.view(afhierarchy)
+    viewable = PIconnect.PI.view(afhierarchy)
     
     #For accessing AssetHierarchy methods, use accessor("ahy") -----
     
@@ -98,7 +100,7 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
     afhierarchy_condensed = afhierarchy.ahy.condense()
     
     #Make condensed afhierarchy visible in variable explorer (string & float representation)
-    viewable2 = JanssenPI.PI.view(afhierarchy_condensed)
+    viewable2 = PIconnect.PI.view(afhierarchy_condensed)
 
 4. Event
 *******************************************************
@@ -154,7 +156,7 @@ An event frame encapsulates the time period of the event and links it to assets 
     summary_values = event.summary(tag_list=['100_091_R014_TT04A'], summary_types=4|8, dataserver=server)
     
     #Make summary dataframe visible in variable explorer (string & float representation)
-    viewable = JanssenPI.PI.view(summary_values)
+    viewable = PIconnect.PI.view(summary_values)
     
     #Return values voor specified attribute(s), if no arguments: returns all
     print(event.get_attribute_values())
@@ -193,7 +195,7 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
     eventhierarchy = eventhierarchy.ehy.add_ref_elements(template_name='UnitProcedure')
     
     #Make EventHierarchy dataframe visible in variable explorer (string & float representation)
-    viewable = JanssenPI.PI.view(eventhierarchy)
+    viewable = PIconnect.PI.view(eventhierarchy)
     
     #Return dataframe of interpolated data for discrete events of EventHierarchy'''
     #Set 'col' argument to 'False' to specify a list of tags
@@ -259,7 +261,7 @@ For example, a Tag might store the flow rate from a meter, a controller's mode o
     tag_overview = server.tag_overview('*091_R019*')
     
     #Make EventHierarchy dataframe visible in variable explorer (string & float representation)
-    viewable = JanssenPI.PI.view(tag_overview)
+    viewable = PIconnect.PI.view(tag_overview)
     
     #Returns TagList with tags that meet the query criteria
     #Here a query is executed to find tag '100_091_R019_TT04A'
@@ -341,8 +343,210 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
     #Return one or more summary values for each interval for a Tag, within a specified timeframe, for values that meet the specified filter condition
     filtered_summaries_values = taglist.filtered_summaries(starttime='*-20d', endtime='*-10d', interval='1d', summary_types=2|4|8, filter_expression="'100_091_R019_TT04A' > 20")
    
-    
+
+10. Overview
+*******************************************************
+
+.. csv-table:: PIServer
+   :header: "Atrribute/ Method", "Type", "Description"
+   :widths: 30, 15, 50
+
+   "**.servers**", "*Attribute*", "Return dictionary of type {servername: <OSIsoft.AF.PI.PIServer object>}"
+   "**.default_server**", "*Attribute*", "Return <OSIsoft.AF.PI.PIServer object>"
+   "**.server_name**", "*Attribute*", "Return name of connected server"
+   "**.find_tags**
+   (query, source=None)", "*Method*", "Return list of Tag objects as a result of the query"
+   "**.tag_overview**
+   (query)", "*Method*", "Return dataframe containing overview of Tag object, tag name, description and UOM for each tag that meets the restrictions specified in the query"
    
+.. csv-table:: Tag
+   :header: "Atrribute/ Method", "Type", "Description"
+   :widths: 30, 15, 50
+
+   "**.name**", "*Attribute*", "Return name of Tag (PIPoint)"
+   "**.pipoint**", "*Attribute*", "Return <OSIsoft.AF.PI.PIPoint object>"
+   "**.server**", "*Attribute*", "Return connected server"
+   "**.raw_attributes**", "*Attribute*", "Return dictionary of the raw attributes"
+   "**.last_update**", "*Attribute*", "Return datetime at which the last value was recorded"
+   "**.uom**", "*Attribute*", "Return units of measument"
+   "**.description**", "*Attribute*", "Return description"
+   "**.created**", "*Attribute*", "Return the creation datetime"
+   "**.pointtype**", "*Attribute*", "Return an integer value corresponding to the pointtype (https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_PI_PIPointType.htm)"
+   "**.pointtype_desc**", "*Attribute*", "Return the pointtype"
+   "**.current_value**
+   ()", "*Method*", "Return last recorded value"
+   "**.interpolated_values**
+   (starttime, endtime, interval, filter_expression='')", "*Method*", "Return Dataframe of interpolated values at specified interval for Tag, between starttime and endtime"
+   "**.recorded_values**
+   (starttime, endtime, filter_expression='', AFBoundaryType=BoundaryType.INTERPOLATED)", "*Method*", "Return Dataframe of recorded values for Tag, between starttime and endtime"
+   "**.plot_values**
+   (starttime, endtime, nr_of_intervals)", "*Method*", "Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels). Returns a Dataframe with values that will produce the most accurate plot over the time range while minimizing the amount of data returned.Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and at most one exceptional point (bad status or digital state)"
+   "**.summary**
+   (starttime, endtime, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return specified summary measure(s) for Tag within the specified timeframe 
+        
+        Summary_types are defined as integers separated by '|'
+        fe: to extract min and max >> event.summary(['tag_x'], dataserver, 4|8)"
+   "**.summaries**
+   (starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return one or more summary values for each interval, within a specified timeframe"
+   "**filtered_summaries**
+   (starttime, endtime, interval,summary_types, filter_expression, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, filter_interval=None)", "*Method*", "Return one or more summary values for each interval, within a specified timeframe, for values that meet the specified filter condition"
+
+
+.. csv-table:: TagList
+   :header: "Atrribute/ Method", "Type", "Description"
+   :widths: 30, 15, 50
+
+   "**.current_values**
+   ()", "*Method*", "Return Dataframe of current values per tag"
+   "**.plot_values**
+   (starttime, endtime, nr_of_intervals)", "*Method*", "Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels). Returns a Dictionary of DataFrames for Tags in Taglist with values that will produce the most accurate plot over the time range while minimizing the amount of data returned"
+   "**.interpolated_values**
+   (starttime, endtime, interval, filter_expression='')", "*Method*", "Return Dataframe of interpolated values for Tags in TagList, between starttime and endtime"
+   "**.recorded_values**
+   (starttime, endtime, filter_expression='', AFBoundaryType=BoundaryType.INTERPOLATED)", "*Method*", "Return dictionary of Dataframes of recorded values for Tags in TagList, between starttime and endtime"
+   "**.summary**
+   (starttime, endtime, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return specified summary measure(s) for Tags in Taglist
+        
+        Summary_types are defined as integers separated by '|'
+        fe: to extract min and max >> event.summary(['tag_x'], dataserver, 4|8)"
+   "**.summaries**
+   (starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return one or more summary values for Tags in Taglist, for each interval within a time range"
+   "**filtered_summaries**
+   (self, starttime, endtime, interval,summary_types, filter_expression, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, filter_interval=None)", "*Method*", "Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet the filter criteria"
+
+
+.. csv-table:: PIAFDatabase
+   :header: "Atrribute/ Method", "Type", "Description"
+   :widths: 30, 15, 50
+
+   "**.servers**", "*Attribute*", "Return dictionary of type {servername: <OSIsoft.AF.PI.PIServer object>, 'database':{databasename: <OSIsoft.AF.AFDatabase object>}}"
+   "**.default_server**", "*Attribute*", "Return dictionary of type {servername: <OSIsoft.AF.PI.PIServer object>, 'database':{databasename: <OSIsoft.AF.AFDatabase object>}} for default server"
+   "**.server_name**", "*Attribute*", "Return name of connected server"
+   "**.database_name**", "*Attribute*", "Return name of connected database"
+   "**.children**", "*Attribute*", "Return dictionary of the direct child elements of the database"
+   "**.descendant**
+   (path)", "*Method*", "Return a descendant of the database from an exact path"
+   "**.find_events**
+   (query=None, asset='*', start_time=None, end_time='*', template_name = None, start_index=0, max_count=1000000, search_mode=SearchMode.OVERLAPPED, search_full_hierarchy=True, sortField=SortField.STARTTIME, sortOrder=SortOrder.ASCENDING)", "*Method*", "Return a EventList of Events that meet query criteria"
+   "**.find_assets**
+   (query=None, top_asset=None, searchField=SearchField.NAME, search_full_hierarchy=True, sortField=SortField.STARTTIME, sortOrder=SortOrder.ASCENDING, max_count=10000000)", "*Method*", "Return list of Assets that meet query criteria"
+   
+   
+.. csv-table:: Event
+   :header: "Atrribute/ Method", "Type", "Description"
+   :widths: 30, 15, 50
+
+   "**.name**", "*Attribute*", "Return name of event"
+   "**.path**", "*Attribute*", "Return path"
+   "**.pisystem_name**", "*Attribute*", "Return PISystem name"
+   "**.database_name**", "*Attribute*", "Return connected database name"
+   "**.database**", "*Attribute*", "Return PIAFDatabase object"
+   "**.af_eventframe**", "*Attribute*", "Return <OSIsoft.AF.EventFrame.AFEventFrame object>"
+   "**.af_template**", "*Attribute*", "Return <OSIsoft.AF.Asset.AFElementTemplate object>"
+   "**.template_name**", "*Attribute*", "Return template name"
+   "**.starttime**", "*Attribute*", "Return starttime"
+   "**.endtime**", "*Attribute*", "Return endtime"
+   "**.af_timerange**", "*Attribute*", "Return <OSIsoft.AF.Time.AFTimeRange object>"
+   "**.attributes**", "*Attribute*", "Return list of attribute names"
+   "**.af_attributes**", "*Attribute*", "Return list of <OSIsoft.AF.Asset.AFAttribute objects>"
+   "**.children**", "*Attribute*", "Return EventList of children"
+   "**.parent**", "*Attribute*", "Return parent event"
+   "**.description**", "*Attribute*", "Return description"
+   "**.duration**", "*Attribute*", "Return duration as datetime.timedelta object"
+   "**.top_event**", "*Attribute*", "Return top-level event name"
+   "**.plot_values**
+   (tag_list, nr_of_intervals, dataserver=None)", "*Method*", "Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels). Returns a Dictionary of DataFrames for tags specified by list of tagnames or Tags within the event, with values that will produce the most accurate plot over the time range while minimizing the amount of data returned. Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and at most one exceptional point (bad status or digital state)"
+   "**.interpolated_values**
+   (tag_list, interval, dataserver=None, filter_expression='')", "*Method*", "Return Dataframe of interpolated values for tags specified by list of tagnames or Tags, for a defined interval within the event"
+   "**.recorded_values**
+   (tag_list, dataserver=None, filter_expression='', AFBoundaryType=BoundaryType.INSIDE)", "*Method*", "Return Dataframe of recorded values for tags specified by list of tagnames or Tags, within the event"
+   "**.summary**
+   (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return specified summary measure(s) for event
+        
+        Summary_types are defined as integers separated by '|'
+        fe: to extract min and max >> event.summary(['tag_x'], dataserver, 4|8)"
+   "**.summaries**
+   (tag_list, interval, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return one or more summary values for Tags in Taglist, for each interval"
+   "**.filtered_summaries**
+   (tag_list, interval,summary_types, filter_expression, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, filter_interval=None)", "*Method*", "Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet filter the criteria"
+   "**.get_attribute_values**
+   (attribute_names_list=[])", "*Method*", "Return dict of attribute values for specified attributes"
+   "**.get_event_hierarchy**
+   (depth=10)", "*Method*", "Return EventHierarchy down to the specified depth"
+   
+   
+.. csv-table:: EventList
+   :header: "Atrribute/ Method", "Type", "Description"
+   :widths: 30, 15, 50   
+   
+   "**.to_set**
+   ()", "*Method*", "Return EventList as set"
+   "**.get_event_hierarchy**
+   (depth=10)", "*Method*", "Return EventHierarchy down to the specified depth"
+   
+.. csv-table:: EventHierarchy
+   :header: "Atrribute/ Method", "Type", "Description"
+   :widths: 30, 15, 50   
+   
+   "**.add_attributes**
+   (attribute_names_list, template_name)", "*Method*", "Add attribute values to EventHierarchy for specified attributes, defined for the specified template"
+   "**.add_ref_elements**
+   (template_name)", "*Method*", "Add referenced element values to EventHierarchy, defined for the specified template"
+   "**.condense**
+   ()", "*Method*", "Condense the EventHierarchy object to return a vertically layered CondensedEventHierarchy object"
+   "**.interpol_discrete_extract**
+   (tag_list, interval, filter_expression='', dataserver=None, col=False)", "*Method*", "Return dataframe of interpolated data for discrete events of EventHierarchy, for the tag(s) specified"
+   "**.summary_extract**
+   (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, col=False)", "*Method*", "Return dataframe of summary measures for discrete events of EventHierarchy, for the tag(s) specified"
+   
+   
+.. csv-table:: CondensedEventHierarchy
+   :header: "Atrribute/ Method", "Type", "Description"
+   :widths: 30, 15, 50  
+   
+   "**.interpol_discrete_extract**
+   (tag_list, interval, filter_expression='', dataserver=None, col=False)", "*Method*", "Return dataframe of interpolated values for discrete events on bottom level of condensed hierarchy"
+   "**.interpol_continuous_extract**
+   (tag_list, interval, filter_expression='', dataserver=None)", "*Method*", "Return dataframe of continous, interpolated values from the start of the first filtered event to the end of the last filtered event, for each procedure, on bottom level of condensed hierarchy"
+   "**.recorded_extract**
+   (tag_list, filter_expression='', AFBoundaryType=BoundaryType.INTERPOLATED, dataserver=None)", "*Method*", "Return nested dictionary (level 1: Procedures, Level 2: Tags) of recorded data extracts from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy"
+   "**.plot_continuous_extract**
+   (tag_list, nr_of_intervals, dataserver=None)", "*Method*", "Return nested dictionary (level 1: Procedures, Level 2: Tags) of continuous plot values from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy. Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and at most one exceptional point (bad status or digital state)"
+   "**.summary_extract**
+   (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, col=False)", "*Method*", "Return dataframe of summary values for events on bottom level of condensed hierarchy"
+
+
+.. csv-table:: Asset
+   :header: "Atrribute/ Method", "Type", "Description"
+   :widths: 30, 15, 50  
+   
+   "**.name**", "*Attribute*", "Return name of Asset"
+   "**.path**", "*Attribute*", "Return path"
+   "**.pisystem_name**", "*Attribute*", "Return PISystem name"
+   "**.database_name**", "*Attribute*", "Return connected database name"
+   "**.database**", "*Attribute*", "Return PIAFDatabase object"
+   "**.af_asset**", "*Attribute*", "Return <OSIsoft.AF.Asset.AFElement object>"
+   "**.af_template**", "*Attribute*", "Return <OSIsoft.AF.Asset.AFElementTemplate object>"
+   "**.template_name**", "*Attribute*", "Return template name"
+   "**.attributes**", "*Attribute*", "Return list of attribute names"
+   "**.af_attributes**", "*Attribute*", "Return list of <OSIsoft.AF.Asset.AFAttribute objects>"
+   "**.children**", "*Attribute*", "Return list of children"
+   "**.parent**", "*Attribute*", "Return parent asset"
+   "**.description**", "*Attribute*", "Return description"
+   "**.get_attribute_values**
+   (attribute_names_list=[])", "*Method*", "Return dict of attribute values for specified attributes"
+   "**.get_events**
+   (query=None, start_time=None, end_time='*', template_name = None, start_index=0, max_count=1000000, search_mode=SearchMode.OVERLAPPED, search_full_hierarchy=True, sortField=SortField.STARTTIME, sortOrder=SortOrder.ASCENDING)", "*Method*", "Return EventList of Events on Asset within specified time period that meets the query criteria"
+   
+
+.. csv-table:: AssetHierarchy
+   :header: "Atrribute/ Method", "Type", "Description"
+   :widths: 30, 15, 50  
+   
+   "**.add_attributes**
+   (attribute_names_list, level)", "*Method*", "Add attributtes to AssetHierarchy for specified attributes and level"
+   "**.condense**
+   ()", "*Method*", "Condense the AssetHierarchy object to return a condensed, vertically layered representation of the Asset Tree"
 
 
 Copyright notice
