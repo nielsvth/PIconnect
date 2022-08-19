@@ -2,7 +2,13 @@
     Core containers for connections to PI databases
 """
 # pragma pylint: disable=unused-import, redefined-builtin
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (
+    absolute_import,
+    division,
+    print_function,
+    unicode_literals,
+)
+from ast import Expression
 
 from builtins import (
     ascii,
@@ -26,6 +32,8 @@ from builtins import (
     super,
     zip,
 )
+import datetime
+from typing import Union
 
 try:
     from __builtin__ import str as BuiltinStr
@@ -33,16 +41,25 @@ except ImportError:
     BuiltinStr = str
 # pragma pylint: enable=unused-import, redefined-builtin
 from warnings import warn
-from JanssenPI._utils import classproperty
-from JanssenPI.AFSDK import AF
-from JanssenPI.PIConsts import AuthenticationMode, BoundaryType, SummaryType, CalculationBasis, TimestampCalculation, PIPointType, ExpressionSampleType
-from JanssenPI.time import timestamp_to_index, to_af_time_range, add_timezone
+from PIconnect._utils import classproperty
+from PIconnect.AFSDK import AF
+from PIconnect.PIConsts import (
+    AuthenticationMode,
+    BoundaryType,
+    SummaryType,
+    CalculationBasis,
+    TimestampCalculation,
+    PIPointType,
+    ExpressionSampleType,
+)
+from PIconnect.time import timestamp_to_index, to_af_time_range, add_timezone
 
 from collections import UserList
 
 import pandas as pd
-pd.options.mode.chained_assignment = None  # default='warn'
 import numpy as np
+
+pd.options.mode.chained_assignment = None  # default='warn'
 _NOTHING = object()
 
 
@@ -50,16 +67,18 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
     """PIServer is a connection to an OSIsoft PI Server
 
     Args:
-        server (str, optional): Name of the server to connect to, defaults to None
+        server (str, optional): Name of the server to connect to.
+            defaults to None
         username (str, optional): can be used only with password as well
         password (str, optional): -//-
         todo: domain, auth
         timeout (int, optional): the maximum seconds an operation can take
 
     .. note::
-        If the specified `server` is unknown a warning is thrown and the connection
-        is redirected to the default server, as if no server was passed. The list
-        of known servers is available in the `PIServer.servers` dictionary.
+        If the specified `server` is unknown a warning is thrown and the
+            connection is redirected to the default server, as if no server
+            was passed. The list of known servers is available in the
+            `PIServer.servers` dictionary.
     """
 
     version = "0.2.2"
@@ -83,11 +102,13 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
             warn(message=message.format(server=server), category=UserWarning)
         if bool(username) != bool(password):
             raise ValueError(
-                "When passing credentials both the username and password must be specified."
+                "When passing credentials both the username and password "
+                + "must be specified."
             )
         if domain and not username:
             raise ValueError(
-                "A domain can only specified together with a username and password."
+                "A domain can only specified together with a username and "
+                + "password."
             )
         if username:
             from System.Net import NetworkCredential
@@ -97,7 +118,10 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
             for c in password:
                 secure_pass.AppendChar(c)
             cred = [username, secure_pass] + ([domain] if domain else [])
-            self._credentials = (NetworkCredential(*cred), int(authentication_mode))
+            self._credentials = (
+                NetworkCredential(*cred),
+                int(authentication_mode),
+            )
         else:
             self._credentials = None
 
@@ -107,7 +131,9 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
             from System import TimeSpan
 
             # System.TimeSpan(hours, minutes, seconds)
-            self.connection.ConnectionInfo.OperationTimeOut = TimeSpan(0, 0, timeout)
+            self.connection.ConnectionInfo.OperationTimeOut = TimeSpan(
+                0, 0, timeout
+            )
 
     @classproperty
     def servers(self):
@@ -125,7 +151,9 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
                     failures += 1
             if failures:
                 warn(
-                    "Could not load {} PI Server(s) out of {}".format(failures, i),
+                    "Could not load {} PI Server(s) out of {}".format(
+                        failures, i
+                    ),
                     ResourceWarning,
                 )
         return self._servers
@@ -162,8 +190,8 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
         Name of the connected server
         """
         return self.connection.Name
-    
-    #methods
+
+    # methods
     def find_tags(self, query, source=None):
         """find_tags
 
@@ -171,7 +199,8 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
 
         Args:
             query (str or [str]): String or list of strings with queries
-            source (str, optional): Defaults to None. Point source to limit the results
+            source (str, optional): Point source to limit the results.
+                Defaults to None.
 
         Returns:
             list: A list of Tag objects as a result of the query
@@ -181,255 +210,526 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
             Reject searches while not connected
         """
         if isinstance(query, list):
-            return TagList([y for x in query for y in self.find_tags(x, source)])
+            return TagList(
+                [y for x in query for y in self.find_tags(x, source)]
+            )
         elif not isinstance(query, str):
-             raise TypeError('Argument query must be either a string or a list of strings,' +
-                             'got type ' + str(type(query)))
-        return TagList([Tag(pi_point)for pi_point in AF.PI.PIPoint.FindPIPoints(self.connection, BuiltinStr(query), source, None)])
-        
-    def tag_overview(self, query):
-        """Returns dataframe containing overview of Tag object, tag name, description and UOM for each tag that meets the restrictions specified in the query"""
+            raise TypeError(
+                "Argument query must be either a string or a list of strings,"
+                + "got type "
+                + str(type(query))
+            )
+        return TagList(
+            [
+                Tag(pi_point)
+                for pi_point in AF.PI.PIPoint.FindPIPoints(
+                    self.connection, BuiltinStr(query), source, None
+                )
+            ]
+        )
+
+    def tag_overview(self, query: str) -> pd.DataFrame:
+        """Returns dataframe containing overview for each tag that meets the
+        restrictions specified in the query
+
+        Args:
+            query (str): string to query
+
+        Returns:
+            pd.DataFrame: dataframe with
+                Tag object
+                Tag name
+                Description
+                UOM
+        """
         tags = self.find_tags(str(query))
-        
+
         df = pd.DataFrame()
-        df['Tag'] = [tag for tag in tags]
-        #load attributes before GET
-        #df['Tag'].apply(lambda x: x.LoadAttributes(['descriptor', 'engunits']))
-        df['Name'] = df['Tag'].apply(lambda x: x.name)
-        df['Description'] = df['Tag'].apply(lambda x: x.description)
-        df['UOM'] = df['Tag'].apply(lambda x: x.uom)
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_PI_PIPointType.htm
-        df['PointType'] = df['Tag'].apply(lambda x: x.pointtype)
-        df['PointType_desc'] = df['Tag'].apply(lambda x: x.pointtype_desc)
+        df["Tag"] = [tag for tag in tags]
+        # load attributes before GET
+        # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_PI_PIPointType.htm
+        attrsToGet = [
+            "Name",
+            "Description",
+            "UOM",
+            "PointType",
+            "PointType_desc",
+        ]
+        for attr in attrsToGet:
+            df[attr] = df["Tag"].apply(lambda x: getattr(x, attr.lower()))
+
         return df
 
-    
+
 class Tag:
-    '''Container for Tag object'''
+    """Container for Tag object"""
+
     def __init__(self, tag):
         self.validate(tag)
         self.tag = tag
         self.__attributes_loaded = False
 
     def __repr__(self):
-        return 'Tag:' + self.name
-    
+        return "Tag:" + self.name
+
     def __str__(self):
-        return 'Tag:' + self.name
-  
+        return "Tag:" + self.name
+
     @staticmethod
     def validate(tag):
-        if not (type(tag) == AF.PI.PIPoint):
-            raise AttributeError('Can not convert this type of input to Tag object')
-    
+        if not isinstance(tag, AF.PI.PIPoint):
+            raise AttributeError(
+                "Can not convert this type of input to Tag object"
+            )
+
     def __load_attributes(self):
         """Load the raw attributes of the PI Point from the server"""
         if not self.__attributes_loaded:
             self.tag.LoadAttributes([])
             self.__attributes_loaded = True
-    
-    #Properties
+
+    # Properties
     @property
     def name(self):
-        '''Return name of Tag'''
+        """Return name of Tag"""
         return self.tag.Name
+
     @property
     def pipoint(self):
-        '''Return '''
+        """Return"""
         return self.tag
+
     @property
     def server(self):
-        '''Return connected server'''
+        """Return connected server"""
         return PIServer(self.tag.Server.Name)
+
     @property
     def raw_attributes(self):
         """Return dictionary of the raw attributes"""
         self.__load_attributes()
         return {att.Key: att.Value for att in self.tag.GetAttributes([])}
+
     @property
     def last_update(self):
         """Return datetime at which the last value was recorded"""
         return timestamp_to_index(self.tag.CurrentValue().Timestamp.UtcTime)
+
     @property
     def uom(self):
         """Return units of measument"""
         return self.raw_attributes["engunits"]
+
     @property
     def description(self):
         """Return description"""
         return self.raw_attributes["descriptor"]
+
     @property
     def created(self):
         """Return the creation datetime"""
-        return timestamp_to_index(self.raw_attributes["creationdate"])    
+        return timestamp_to_index(self.raw_attributes["creationdate"])
+
     @property
     def pointtype(self):
-        '''Return an integer value corresponding to the pointtype
-        ref: https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_PI_PIPointType.htm'''
-        return self.tag.PointType   
+        """Return an integer value corresponding to the pointtype"""
+        # ref: https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_PI_PIPointType.htm # noqa
+        return self.tag.PointType
+
     @property
     def pointtype_desc(self):
-        '''Return the pointtype'''
+        """Return the pointtype"""
         return str(PIPointType(self.pointtype))
 
-    #Methods
+    # Methods
     def current_value(self):
         """Return last recorded value"""
         return self.tag.CurrentValue().Value
-    
-    def interpolated_values(self, starttime, endtime, interval, filter_expression=''):
-        ''''Return Dataframe of interpolated values at specified interval, between starttime and endtime'''
+
+    def interpolated_values(
+        self,
+        starttime: Union[str, datetime.datetime],
+        endtime: Union[str, datetime.datetime],
+        interval: str,
+        filter_expression: str = "",
+    ) -> pd.DataFrame:
+        """Retrieve interpolated data across a time range and specified
+        interval using optional expression.
+
+        Args:
+            starttime (Union[str, datetime.datetime]): start time
+            endtime (Union[str, datetime.datetime]): end time
+            interval (str): interval to interpolate to
+            filter_expression (str, optional): Filter expression.
+                Defaults to "".
+
+        Returns:
+            pd.DataFrame: resulting dataframe
+        """
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         AFTimeRange = to_af_time_range(starttime, endtime)
         filter_expression = filter_expression.replace("%tag%", self.name)
 
-        #Could have issues with quering multiple PI Data Archives simultanously, see documentation
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_InterpolatedValues.htm
-        result = self.tag.InterpolatedValues(AFTimeRange, AFInterval, filter_expression, False)
+        # Could have issues with quering multiple PI Data Archives
+        # simultanously, see documentation:
+        # https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_InterpolatedValues.htm # noqa
+        result = self.tag.InterpolatedValues(
+            AFTimeRange, AFInterval, filter_expression, False
+        )
 
         if result:
-            #process query results
+            # process query results
             data = [list(result)]
             df = pd.DataFrame(data).T
             df.columns = [self.name]
-            #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
-            df.index = df[df.columns[0]].apply(lambda x: timestamp_to_index(x.Timestamp.UtcTime))
-            df.index.name = 'Index'
+            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
+            df.index = df[df.columns[0]].apply(
+                lambda x: timestamp_to_index(x.Timestamp.UtcTime)
+            )
+            df.index.name = "Index"
             df = df.applymap(lambda x: x.Value)
             return df
-        else: #if no result, return empty dataframe
+        else:  # if no result, return empty dataframe
             return pd.DataFrame()
 
+    def recorded_values(
+        self,
+        starttime: Union[str, datetime.datetime],
+        endtime: Union[str, datetime.datetime],
+        filter_expression: str = "",
+        AFBoundaryType=BoundaryType.INTERPOLATED,
+    ) -> pd.DataFrame:
+        """Retrieve recorded data across a time range and specified
+        using optional expression.
 
-    def recorded_values(self, starttime, endtime, filter_expression='', AFBoundaryType=BoundaryType.INTERPOLATED):
-        ''''Return Dataframe of recorded values, between starttime and endtime'''
+        Args:
+            starttime (Union[str, datetime.datetime]): start time
+            endtime (Union[str, datetime.datetime]): end time
+            filter_expression (str, optional): Filter expression.
+                Defaults to "".
+            AFBoundaryType (_type_, optional): Defined Boundary type.
+                Defaults to BoundaryType.INTERPOLATED.
+
+        Returns:
+            pd.DataFrame: resultant dataframe
+        """
         AFTimeRange = to_af_time_range(starttime, endtime)
         filter_expression = filter_expression.replace("%tag%", self.name)
 
-        #Could have issues with quering multiple PI Data Archives simultanously, see documentation
-        #maximum number of events that can be returned with a single call. As of PI 3.4.380, the default is set at 1.5M
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_RecordedValues.htm
-        result = self.tag.RecordedValues(AFTimeRange, AFBoundaryType, filter_expression, False)
-        
+        # Could have issues with quering multiple PI Data Archives
+        # simultanously, see documentation maximum number of events that can
+        # be returned with a single call. As of PI 3.4.380, the default is
+        # set at 1.5M. Additonal info at:
+        # https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_RecordedValues.htm # noqa
+        result = self.tag.RecordedValues(
+            AFTimeRange, AFBoundaryType, filter_expression, False
+        )
+
         if result:
-            #process query results
+            # process query results
             data = [list(result)]
             df = pd.DataFrame(data).T
             df.columns = [self.name]
-            #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
-            df.index = df[df.columns[0]].apply(lambda x: timestamp_to_index(x.Timestamp.UtcTime))
-            df.index.name = 'Index'
+            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm # noqa
+            df.index = df[df.columns[0]].apply(
+                lambda x: timestamp_to_index(x.Timestamp.UtcTime)
+            )
+            df.index.name = "Index"
             df = df.applymap(lambda x: x.Value)
-            return df
-        else: #if no result, return empty dataframe
-            return pd.DataFrame()
-    
-    def plot_values(self, starttime, endtime, nr_of_intervals):
-        '''Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels)
-        Returns a Dataframe with values that will produce the most accurate plot over the time range while minimizing the amount of data returned.
-        Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and 
-        at most one exceptional point (bad status or digital state)'''
+        else:  # if no result, return empty dataframe
+            df = pd.DataFrame()
+
+        return df
+
+    def plot_values(
+        self,
+        starttime: Union[str, datetime.datetime],
+        endtime: Union[str, datetime.datetime],
+        nr_of_intervals: int,
+    ) -> pd.DataFrame:
+        """Retrieves values over the specified time range suitable for
+        plotting over the number of intervals (typically represents pixels).
+        Each interval can produce up to 5 values if they are unique, the first
+        value in the interval, the last value, the highest value, the lowest
+        value and at most one exceptional point (bad status or digital state).
+
+        Args:
+            starttime (Union[str, datetime.datetime]): start time
+            endtime (Union[str, datetime.datetime]): end time
+            nr_of_intervals (int): Number of intervals
+
+        Returns:
+            pd.DataFrame: Dataframe with values that will produce the most
+            accurate plot over the time range while minimizing the amount
+            of data returned
+        """
         AFTimeRange = to_af_time_range(starttime, endtime)
 
         result = self.tag.PlotValues(AFTimeRange, nr_of_intervals)
 
         if result:
-            #process query results
+            # process query results
             data = [list(result)]
             df = pd.DataFrame(data).T
             df.columns = [self.name]
-            #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
-            df.index = df[df.columns[0]].apply(lambda x: timestamp_to_index(x.Timestamp.UtcTime))
-            df.index.name = 'Index'
+            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm # noqa
+            df.index = df[df.columns[0]].apply(
+                lambda x: timestamp_to_index(x.Timestamp.UtcTime)
+            )
+            df.index.name = "Index"
             df = df.applymap(lambda x: x.Value)
-            return df
         else:
-            return pd.DataFrame
+            df = pd.DataFrame()
+        return df
 
-    
-    #CalculationBasis.EVENT_WEIGHTED avoids issues(?) with interpolation: ref. #Issue 1
-    def summary(self, starttime, endtime, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO):
-        '''Return specified summary measure(s) for Tag within the specified timeframe 
-        
-        Summary_types are defined as integers separated by '|'
-        fe: to extract min and max >> event.summary(['tag_x'], dataserver, 4|8) 
-        
-        Integer values for all summary measures are specified below:
-        
-        - TOTAL = 1: A total over the time span
-        - AVERAGE = 2: Average value over the time span
-        - MINIMUM = 4: The minimum value in the time span
-        - MAXIMUM = 8: The maximum value in the time span
-        - RANGE = 16: The range of the values (max-min) in the time span
-        - STD_DEV = 32 : The sample standard deviation of the values over the time span
-        - POP_STD_DEV = 64: The population standard deviation of the values over the time span
-        - COUNT = 128: The sum of the event count (when the calculation is event weighted). The sum of the event time duration (when the calculation is time weighted.)
-        - PERCENT_GOOD = 8192: The percentage of the data with a good value over the time range. Based on time for time weighted calculations, based on event count for event weigthed calculations.
-        - TOTAL_WITH_UOM = 16384: The total over the time span, with the unit of measurement that's associated with the input (or no units if not defined for the input)
-        - ALL = 24831: A convenience to retrieve all summary types
-        - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all summary types for non-numeric data'''
-        
+    # CalculationBasis.EVENT_WEIGHTED avoids issues(?) with interpolation:
+    # ref. #Issue 1
+    def summary(
+        self,
+        starttime: Union[str, datetime.datetime],
+        endtime: Union[str, datetime.datetime],
+        summary_types: int,
+        calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
+        time_type: TimestampCalculation = TimestampCalculation.AUTO,
+    ) -> pd.DataFrame:
+        """Return specified summary measure(s) for Tag within the specified
+        timeframe
+
+        Args:
+            starttime (Union[str, datetime.datetime]): start time
+            endtime (Union[str, datetime.datetime]): end time
+            summary_types (int): integers separated by '|'. List given
+                below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+
+                - TOTAL = 1: A total over the time span
+                - AVERAGE = 2: Average value over the time span
+                - MINIMUM = 4: The minimum value in the time span
+                - MAXIMUM = 8: The maximum value in the time span
+                - RANGE = 16: The range of the values (max-min) in the time
+                    span
+                - STD_DEV = 32 : The sample standard deviation of the values
+                    over the time span
+                - POP_STD_DEV = 64: The population standard deviation of the
+                    values over the time span
+                - COUNT = 128: The sum of the event count (when the
+                    calculation is event weighted). The sum of the event time
+                        duration (when the calculation is time weighted.)
+                - PERCENT_GOOD = 8192: The percentage of the data with a good
+                    value over the time range. Based on time for time weighted
+                        calculations, based on event count for event weigthed
+                        calculations.
+                - TOTAL_WITH_UOM = 16384: The total over the time span, with
+                    the unit of measurement that's associated with the input
+                    (or no units if not defined for the input)
+                - ALL = 24831: A convenience to retrieve all summary types
+                - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
+                    summary types for non-numeric data
+
+            calculation_basis (CalculationBasis, optional): Basis by which to
+                calculate the summary statistic.
+                Defaults to CalculationBasis.TIME_WEIGHTED.
+            time_type (TimestampCalculation, optional): How the timestamp is
+                calculated. Defaults to TimestampCalculation.AUTO.
+
+        Returns:
+            pd.DataFrame: Dataframe with requested summary statistics
+        """
         AFTimeRange = to_af_time_range(starttime, endtime)
 
-        result = self.tag.Summary(AFTimeRange, summary_types, calculation_basis, time_type)    
+        result = self.tag.Summary(
+            AFTimeRange, summary_types, calculation_basis, time_type
+        )
 
         df_final = pd.DataFrame()
-        for x in result: #per summary
+        for x in result:  # per summary
             summary = SummaryType(x.Key).name
             value = x.Value
             timestamp = timestamp_to_index(x.Value.Timestamp.UtcTime)
-            df = pd.DataFrame([[summary, value, timestamp]], columns = ['Summary', 'Value', 'Timestamp'])
+            df = pd.DataFrame(
+                [[summary, value, timestamp]],
+                columns=["Summary", "Value", "Timestamp"],
+            )
             df_final = df_final.append(df, ignore_index=True)
-            
+
         return df_final
 
+    def summaries(
+        self,
+        starttime: Union[str, datetime.datetime],
+        endtime: Union[str, datetime.datetime],
+        interval: str,
+        summary_types: int,
+        calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
+        time_type: TimestampCalculation = TimestampCalculation.AUTO,
+    ) -> pd.DataFrame:
+        """Return specified summary measure(s) for each interval within the
+        specified timeframe
 
-    def summaries(self, starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO):
-        '''Return one or more summary values for each interval, within a specified timeframe'''
+        Args:
+            starttime (Union[str, datetime.datetime]): start time
+            endtime (Union[str, datetime.datetime]): end time
+            interval (str): interval to interpolate to
+            summary_types (int): integers separated by '|'. List given
+                below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+
+                - TOTAL = 1: A total over the time span
+                - AVERAGE = 2: Average value over the time span
+                - MINIMUM = 4: The minimum value in the time span
+                - MAXIMUM = 8: The maximum value in the time span
+                - RANGE = 16: The range of the values (max-min) in the time
+                    span
+                - STD_DEV = 32 : The sample standard deviation of the values
+                    over the time span
+                - POP_STD_DEV = 64: The population standard deviation of the
+                    values over the time span
+                - COUNT = 128: The sum of the event count (when the
+                    calculation is event weighted). The sum of the event time
+                        duration (when the calculation is time weighted.)
+                - PERCENT_GOOD = 8192: The percentage of the data with a good
+                    value over the time range. Based on time for time weighted
+                        calculations, based on event count for event weigthed
+                        calculations.
+                - TOTAL_WITH_UOM = 16384: The total over the time span, with
+                    the unit of measurement that's associated with the input
+                    (or no units if not defined for the input)
+                - ALL = 24831: A convenience to retrieve all summary types
+                - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
+                    summary types for non-numeric data
+
+            calculation_basis (CalculationBasis, optional): Basis by which to
+                calculate the summary statistic.
+                Defaults to CalculationBasis.TIME_WEIGHTED.
+            time_type (TimestampCalculation, optional): How the timestamp is
+                calculated. Defaults to TimestampCalculation.AUTO.
+
+        Returns:
+            pd.DataFrame: Dataframe with requested summary statistics
+        """
         AFTimeRange = to_af_time_range(starttime, endtime)
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
-        
-        result = self.tag.Summaries(AFTimeRange, AFInterval, summary_types, calculation_basis, time_type)     
+
+        result = self.tag.Summaries(
+            AFTimeRange,
+            AFInterval,
+            summary_types,
+            calculation_basis,
+            time_type,
+        )
 
         df_final = pd.DataFrame()
-        for x in result: #per summary
+        for x in result:  # per summary
             summary = SummaryType(x.Key).name
-            values = [(timestamp_to_index(value.Timestamp.UtcTime), value.Value) for value in x.Value]
-            df = pd.DataFrame(values, columns = ['Timestamp', 'Value'])
-            df['Summary'] = summary
+            values = [
+                (timestamp_to_index(value.Timestamp.UtcTime), value.Value)
+                for value in x.Value
+            ]
+            df = pd.DataFrame(values, columns=["Timestamp", "Value"])
+            df["Summary"] = summary
             df_final = df_final.append(df, ignore_index=True)
-        
-        return df_final[['Summary', 'Timestamp', 'Value']]
- 
-    def filtered_summaries(self, starttime, endtime, interval,summary_types,
-                           filter_expression,
-                           calculation_basis=CalculationBasis.TIME_WEIGHTED, 
-                           time_type=TimestampCalculation.AUTO, 
-                           AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, 
-                           filter_interval=None):       
-        
-        '''Return one or more summary values for each interval, within a specified timeframe, for values that meet the specified filter condition'''
+
+        return df_final[["Summary", "Timestamp", "Value"]]
+
+    def filtered_summaries(
+        self,
+        starttime: Union[str, datetime.datetime],
+        endtime: Union[str, datetime.datetime],
+        interval: str,
+        summary_types: int,
+        filter_expression: str,
+        calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
+        time_type: TimestampCalculation = TimestampCalculation.AUTO,
+        AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.EXPRESSION_RECORDED_VALUES,  # noqa
+        filter_interval: str = None,
+    ) -> pd.DataFrame:
+        """Return one or more summary values for each interval, within a
+        specified timeframe, for values that meet the specified filter
+        condition
+
+        Args:
+            starttime (Union[str, datetime.datetime]): start time
+            endtime (Union[str, datetime.datetime]): end time
+            interval (str): interval to interpolate to
+            summary_types (int): integers separated by '|'. List given
+                below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+
+                - TOTAL = 1: A total over the time span
+                - AVERAGE = 2: Average value over the time span
+                - MINIMUM = 4: The minimum value in the time span
+                - MAXIMUM = 8: The maximum value in the time span
+                - RANGE = 16: The range of the values (max-min) in the time
+                    span
+                - STD_DEV = 32 : The sample standard deviation of the values
+                    over the time span
+                - POP_STD_DEV = 64: The population standard deviation of the
+                    values over the time span
+                - COUNT = 128: The sum of the event count (when the
+                    calculation is event weighted). The sum of the event time
+                        duration (when the calculation is time weighted.)
+                - PERCENT_GOOD = 8192: The percentage of the data with a good
+                    value over the time range. Based on time for time weighted
+                        calculations, based on event count for event weigthed
+                        calculations.
+                - TOTAL_WITH_UOM = 16384: The total over the time span, with
+                    the unit of measurement that's associated with the input
+                    (or no units if not defined for the input)
+                - ALL = 24831: A convenience to retrieve all summary types
+                - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
+                    summary types for non-numeric data
+
+            filter_expression (str):  Filter expression.
+            calculation_basis (CalculationBasis, optional): Basis by which to
+                calculate the summary statistic.
+                Defaults to CalculationBasis.TIME_WEIGHTED.
+            time_type (TimestampCalculation, optional): How the timestamp is
+                calculated. Defaults to TimestampCalculation.AUTO.
+            AFfilter_evaluation (ExpressionSampleType, optional): Expression
+                Type. Defaults to
+                ExpressionSampleType.EXPRESSION_RECORDED_VALUES.
+            filter_interval (str, optional): _description_. Defaults to None.
+
+        Returns:
+            pd.DataFrame: Dataframe with requested summary statistics
+        """
         AFTimeRange = to_af_time_range(starttime, endtime)
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         filter_expression = filter_expression.replace("%tag%", self.name)
-        AFfilter_interval=AF.Time.AFTimeSpan.Parse(filter_interval)
+        AFfilter_interval = AF.Time.AFTimeSpan.Parse(filter_interval)
 
-        result = self.tag.FilteredSummaries(AFTimeRange, AFInterval, filter_expression, summary_types, calculation_basis, AFfilter_evaluation, AFfilter_interval, time_type)     
+        result = self.tag.FilteredSummaries(
+            AFTimeRange,
+            AFInterval,
+            filter_expression,
+            summary_types,
+            calculation_basis,
+            AFfilter_evaluation,
+            AFfilter_interval,
+            time_type,
+        )
 
         df_final = pd.DataFrame()
-        for x in result: #per summary
+        for x in result:  # per summary
             summary = SummaryType(x.Key).name
-            values = [(timestamp_to_index(value.Timestamp.UtcTime), value.Value) for value in x.Value]
-            df = pd.DataFrame(values, columns = ['Timestamp', 'Value'])
-            df['Summary'] = summary
+            values = [
+                (timestamp_to_index(value.Timestamp.UtcTime), value.Value)
+                for value in x.Value
+            ]
+            df = pd.DataFrame(values, columns=["Timestamp", "Value"])
+            df["Summary"] = summary
             df_final = df_final.append(df, ignore_index=True)
-        
-        return df_final[['Summary', 'Value', 'Timestamp',]]
 
-            
+        out = df_final[
+            [
+                "Summary",
+                "Value",
+                "Timestamp",
+            ]
+        ]
+
+        return out
+
 
 class TagList(UserList):
-    '''Container for TagList object'''
+    """Container for TagList object"""
 
     def __init__(self, data):
         self.validate(data)
@@ -437,121 +737,164 @@ class TagList(UserList):
 
     def __repr__(self):
         return str([tag for tag in self.data])
-    
+
     def __str__(self):
         return str([tag for tag in self.data])
-    
+
     @staticmethod
     def validate(data):
-        '''Validate input meets requirements for TagList'''
+        """Validate input meets requirements for TagList"""
         try:
             for tag in data:
                 if type(tag) == Tag:
                     pass
                 else:
-                    raise AttributeError('Can not convert tag of type {} to TagList object'.format(type(tag)))
+                    raise AttributeError(
+                        "Can not convert tag of type {} to TagList object".format(
+                            type(tag)
+                        )
+                    )
         except:
-            raise AttributeError('Can not convert this type of input to TagList object')
-    
+            raise AttributeError(
+                "Can not convert this type of input to TagList object"
+            )
+
     def current_values(self):
-        '''Return Dataframe of current values per tag'''
+        """Return Dataframe of current values per tag"""
         PIPointlist = generate_pipointlist(self)
         result = PIPointlist.CurrentValue()
         if result:
             values = [x.Value for x in result]
             tags = [x.PIPoint.Name for x in result]
-            return pd.DataFrame([values], columns=tags) 
+            return pd.DataFrame([values], columns=tags)
         else:
-            return pd.DataFrame 
-    
+            return pd.DataFrame
+
     def plot_values(self, starttime, endtime, nr_of_intervals):
-        '''Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels)
-        Returns a Dictionary of DataFrames for Tags in Taglist with values that will produce the most accurate plot over the time range while minimizing the amount of data returned'''
+        """Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels)
+        Returns a Dictionary of DataFrames for Tags in Taglist with values that will produce the most accurate plot over the time range while minimizing the amount of data returned"""
         AFTimeRange = to_af_time_range(starttime, endtime)
         PIPointlist = generate_pipointlist(self)
 
-        result = PIPointlist.PlotValues(AFTimeRange, nr_of_intervals, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))
+        result = PIPointlist.PlotValues(
+            AFTimeRange,
+            nr_of_intervals,
+            AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000),
+        )
 
         if result:
-            #process query results
+            # process query results
             data = list(result.ResultQueue.GetConsumingEnumerable())
-            data = [list(series)for series in data]
-            
+            data = [list(series) for series in data]
+
             dct = {}
             tags = [tag.Name for tag in result.PointList]
             for i, lst in enumerate(data):
                 df = pd.DataFrame([lst]).T
-                df.columns = ['Data']
-                #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
-                df.index = df['Data'].apply(lambda x: timestamp_to_index(x.Timestamp.UtcTime))
-                df.index.name = 'Index'
+                df.columns = ["Data"]
+                # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
+                df.index = df["Data"].apply(
+                    lambda x: timestamp_to_index(x.Timestamp.UtcTime)
+                )
+                df.index.name = "Index"
                 df = df.applymap(lambda x: x.Value)
                 dct[tags[i]] = df
             return dct
         else:
             return dict()
- 
-    def interpolated_values(self, starttime, endtime, interval, filter_expression=''):
-        ''''Return Dataframe of interpolated values for Tags in TagList, between starttime and endtime'''
+
+    def interpolated_values(
+        self, starttime, endtime, interval, filter_expression=""
+    ):
+        """'Return Dataframe of interpolated values for Tags in TagList, between starttime and endtime"""
         PIPointlist = generate_pipointlist(self)
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         AFTimeRange = to_af_time_range(starttime, endtime)
-        
-        #Could have issues with quering multiple PI Data Archives simultanously, see documentation
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_InterpolatedValues.htm
-        result = PIPointlist.InterpolatedValues(AFTimeRange, AFInterval, filter_expression, False, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))
-        
+
+        # Could have issues with quering multiple PI Data Archives simultanously, see documentation
+        # https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_InterpolatedValues.htm
+        result = PIPointlist.InterpolatedValues(
+            AFTimeRange,
+            AFInterval,
+            filter_expression,
+            False,
+            AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000),
+        )
+
         if result:
-            #process query results
+            # process query results
             data = list(result.ResultQueue.GetConsumingEnumerable())
-            data = [list(series)for series in data]
+            data = [list(series) for series in data]
             df = pd.DataFrame(data).T
             df.columns = [tag.Name for tag in result.PointList]
-            #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
-            df.index = df[df.columns[0]].apply(lambda x: timestamp_to_index(x.Timestamp.UtcTime))
-            df.index.name = 'Index'
+            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
+            df.index = df[df.columns[0]].apply(
+                lambda x: timestamp_to_index(x.Timestamp.UtcTime)
+            )
+            df.index.name = "Index"
             df = df.applymap(lambda x: x.Value)
             return df
-        else: #if no result, return empty dataframe
+        else:  # if no result, return empty dataframe
             return pd.DataFrame()
 
-    def recorded_values(self, starttime, endtime, filter_expression='', AFBoundaryType=BoundaryType.INTERPOLATED):
-        ''''Return dictionary of Dataframes of recorded values for Tags in TagList, between starttime and endtime'''
+    def recorded_values(
+        self,
+        starttime,
+        endtime,
+        filter_expression="",
+        AFBoundaryType=BoundaryType.INTERPOLATED,
+    ):
+        """'Return dictionary of Dataframes of recorded values for Tags in TagList, between starttime and endtime"""
         PIPointlist = generate_pipointlist(self)
         AFTimeRange = to_af_time_range(starttime, endtime)
 
-        #Could have issues with quering multiple PI Data Archives simultanously, see documentation
-        #maximum number of events that can be returned with a single call. As of PI 3.4.380, the default is set at 1.5M
-        #https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_RecordedValues.htm
-        result = PIPointlist.RecordedValues(AFTimeRange, AFBoundaryType, filter_expression, False, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))
-        
+        # Could have issues with quering multiple PI Data Archives simultanously, see documentation
+        # maximum number of events that can be returned with a single call. As of PI 3.4.380, the default is set at 1.5M
+        # https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_RecordedValues.htm
+        result = PIPointlist.RecordedValues(
+            AFTimeRange,
+            AFBoundaryType,
+            filter_expression,
+            False,
+            AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000),
+        )
+
         if result:
-            #process query results
+            # process query results
             data = list(result.ResultQueue.GetConsumingEnumerable())
-            data = [list(series)for series in data]
-            
+            data = [list(series) for series in data]
+
             dct = {}
             tags = [tag.Name for tag in result.PointList]
             for i, lst in enumerate(data):
                 df = pd.DataFrame([lst]).T
-                df.columns = ['Data']
-                #https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
-                df.index = df['Data'].apply(lambda x: timestamp_to_index(x.Timestamp.UtcTime))
-                df.index.name = 'Index'
+                df.columns = ["Data"]
+                # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
+                df.index = df["Data"].apply(
+                    lambda x: timestamp_to_index(x.Timestamp.UtcTime)
+                )
+                df.index.name = "Index"
                 df = df.applymap(lambda x: x.Value)
                 dct[tags[i]] = df
             return dct
-        else: #if no result, return empty dictionary
+        else:  # if no result, return empty dictionary
             return dict()
-    
-    def summary(self, starttime, endtime, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO):
-        '''Return specified summary measure(s) for Tags in Taglist
-        
+
+    def summary(
+        self,
+        starttime,
+        endtime,
+        summary_types,
+        calculation_basis=CalculationBasis.TIME_WEIGHTED,
+        time_type=TimestampCalculation.AUTO,
+    ):
+        """Return specified summary measure(s) for Tags in Taglist
+
         Summary_types are defined as integers separated by '|'
-        fe: to extract min and max >> event.summary(['tag_x'], dataserver, 4|8) 
-        
+        fe: to extract min and max >> event.summary(['tag_x'], dataserver, 4|8)
+
         Integer values for all summary measures are specified below:
-        
+
         - TOTAL = 1: A total over the time span
         - AVERAGE = 2: Average value over the time span
         - MINIMUM = 4: The minimum value in the time span
@@ -563,102 +906,173 @@ class TagList(UserList):
         - PERCENT_GOOD = 8192: The percentage of the data with a good value over the time range. Based on time for time weighted calculations, based on event count for event weigthed calculations.
         - TOTAL_WITH_UOM = 16384: The total over the time span, with the unit of measurement that's associated with the input (or no units if not defined for the input)
         - ALL = 24831: A convenience to retrieve all summary types
-        - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all summary types for non-numeric data'''
-        
+        - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all summary types for non-numeric data"""
+
         PIPointlist = generate_pipointlist(self)
         AFTimeRange = to_af_time_range(starttime, endtime)
 
-        result = PIPointlist.Summary(AFTimeRange, summary_types, calculation_basis, time_type, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))    
-        #to avoid queue emptying
+        result = PIPointlist.Summary(
+            AFTimeRange,
+            summary_types,
+            calculation_basis,
+            time_type,
+            AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000),
+        )
+        # to avoid queue emptying
         data = list(result)
         if data:
             df_final = pd.DataFrame()
-            for x in data: #per tag
+            for x in data:  # per tag
                 point = [y.PIPoint.Name for y in x.Values][0]
                 summaries = [SummaryType(y).name for y in x.Keys]
-                values = [[y.Value, timestamp_to_index(y.Timestamp.UtcTime)] for y in x.Values]
-                df = pd.DataFrame(values, columns = ['Value', 'Timestamp'])
-                df['Tag'] = point
-                df['Summary'] = summaries
+                values = [
+                    [y.Value, timestamp_to_index(y.Timestamp.UtcTime)]
+                    for y in x.Values
+                ]
+                df = pd.DataFrame(values, columns=["Value", "Timestamp"])
+                df["Tag"] = point
+                df["Summary"] = summaries
                 df_final = df_final.append(df, ignore_index=True)
-                
-            return df_final[['Tag', 'Summary','Value', 'Timestamp']]
+
+            return df_final[["Tag", "Summary", "Value", "Timestamp"]]
         else:
             return pd.DataFrame()
 
-
-    def summaries(self, starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO):
-        '''Return one or more summary values for Tags in Taglist, for each interval within a time range'''
+    def summaries(
+        self,
+        starttime,
+        endtime,
+        interval,
+        summary_types,
+        calculation_basis=CalculationBasis.TIME_WEIGHTED,
+        time_type=TimestampCalculation.AUTO,
+    ):
+        """Return one or more summary values for Tags in Taglist, for each interval within a time range"""
         PIPointlist = generate_pipointlist(self)
         AFTimeRange = to_af_time_range(starttime, endtime)
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
 
-        result = PIPointlist.Summaries(AFTimeRange, AFInterval, summary_types, calculation_basis, time_type, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))     
+        result = PIPointlist.Summaries(
+            AFTimeRange,
+            AFInterval,
+            summary_types,
+            calculation_basis,
+            time_type,
+            AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000),
+        )
         data = list(result)
         if data:
             df_final = pd.DataFrame()
-            for x in data: #per tag
+            for x in data:  # per tag
                 point = [y.PIPoint.Name for y in x.Values][0]
                 summaries = [y for y in x.Keys]
-                df = pd.DataFrame([[point, summary] for summary in summaries], columns = ['Tag', 'Summary'])
-                df['Timestamp'] = df['Summary'].apply(lambda key: [(timestamp_to_index(value.Timestamp.UtcTime), value.Value) for value in x[key]])
-                df['Summary'] = df['Summary'].apply(lambda x: SummaryType(x).name)
-                df = df.explode('Timestamp')
-                df[['Timestamp', 'Value']] = df['Timestamp'].apply(pd.Series) #explode list to columns
+                df = pd.DataFrame(
+                    [[point, summary] for summary in summaries],
+                    columns=["Tag", "Summary"],
+                )
+                df["Timestamp"] = df["Summary"].apply(
+                    lambda key: [
+                        (
+                            timestamp_to_index(value.Timestamp.UtcTime),
+                            value.Value,
+                        )
+                        for value in x[key]
+                    ]
+                )
+                df["Summary"] = df["Summary"].apply(
+                    lambda x: SummaryType(x).name
+                )
+                df = df.explode("Timestamp")
+                df[["Timestamp", "Value"]] = df["Timestamp"].apply(
+                    pd.Series
+                )  # explode list to columns
                 df_final = df_final.append(df, ignore_index=True)
-            
-            return df_final[['Tag', 'Summary','Value', 'Timestamp']]
+
+            return df_final[["Tag", "Summary", "Value", "Timestamp"]]
         else:
             return pd.DataFrame()
-    
-    def filtered_summaries(self, starttime, endtime, interval,summary_types,
-                           filter_expression,
-                           calculation_basis=CalculationBasis.TIME_WEIGHTED, 
-                           time_type=TimestampCalculation.AUTO, 
-                           AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, 
-                           filter_interval=None):       
-        
-        '''Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet the filter criteria'''
+
+    def filtered_summaries(
+        self,
+        starttime,
+        endtime,
+        interval,
+        summary_types,
+        filter_expression,
+        calculation_basis=CalculationBasis.TIME_WEIGHTED,
+        time_type=TimestampCalculation.AUTO,
+        AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES,
+        filter_interval=None,
+    ):
+
+        """Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet the filter criteria"""
         PIPointlist = generate_pipointlist(self)
         AFTimeRange = to_af_time_range(starttime, endtime)
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
-        AFfilter_interval=AF.Time.AFTimeSpan.Parse(filter_interval)
-        result = PIPointlist.FilteredSummaries(AFTimeRange, AFInterval, filter_expression, summary_types, calculation_basis, AFfilter_evaluation, AFfilter_interval, time_type, AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000))     
+        AFfilter_interval = AF.Time.AFTimeSpan.Parse(filter_interval)
+        result = PIPointlist.FilteredSummaries(
+            AFTimeRange,
+            AFInterval,
+            filter_expression,
+            summary_types,
+            calculation_basis,
+            AFfilter_evaluation,
+            AFfilter_interval,
+            time_type,
+            AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000),
+        )
 
         data = list(result)
         if data:
             df_final = pd.DataFrame()
-            for x in data: #per tag
+            for x in data:  # per tag
                 point = [y.PIPoint.Name for y in x.Values][0]
                 summaries = [y for y in x.Keys]
-                df = pd.DataFrame([[point, summary] for summary in summaries], columns = ['Tag', 'Summary'])
-                df['Timestamp'] = df['Summary'].apply(lambda key: [(timestamp_to_index(value.Timestamp.UtcTime), value.Value) for value in x[key]])
-                df['Summary'] = df['Summary'].apply(lambda x: SummaryType(x).name)
-                df = df.explode('Timestamp')
-                df[['Timestamp', 'Value']] = df['Timestamp'].apply(pd.Series) #explode list to columns
+                df = pd.DataFrame(
+                    [[point, summary] for summary in summaries],
+                    columns=["Tag", "Summary"],
+                )
+                df["Timestamp"] = df["Summary"].apply(
+                    lambda key: [
+                        (
+                            timestamp_to_index(value.Timestamp.UtcTime),
+                            value.Value,
+                        )
+                        for value in x[key]
+                    ]
+                )
+                df["Summary"] = df["Summary"].apply(
+                    lambda x: SummaryType(x).name
+                )
+                df = df.explode("Timestamp")
+                df[["Timestamp", "Value"]] = df["Timestamp"].apply(
+                    pd.Series
+                )  # explode list to columns
                 df_final = df_final.append(df, ignore_index=True)
-            
-            return df_final[['Tag', 'Summary','Value', 'Timestamp']]
+
+            return df_final[["Tag", "Summary", "Value", "Timestamp"]]
         else:
             return pd.DataFrame()
 
-   
-#aux functions
+
+# aux functions
+
 
 def generate_pipointlist(tag_list):
-    '''Generate and populate object of PIPointList class from TagList object'''
+    """Generate and populate object of PIPointList class from TagList object"""
     if not type(tag_list) == TagList:
-        raise Exception ("Input is not a TagList object")
+        raise Exception("Input is not a TagList object")
 
     PIPointlist = AF.PI.PIPointList()
     for tag in tag_list:
         PIPointlist.Add(tag.pipoint)
     return PIPointlist
-    
+
+
 def convert_to_TagList(tag_list, dataserver=None):
-    ''' Convert list of strings OR list of Tag objects to Taglist '''
+    """Convert list of strings OR list of Tag objects to Taglist"""
     if type(tag_list) == str:
-        raise Exception ("Tag(s) need to be inside a list")
+        raise Exception("Tag(s) need to be inside a list")
     elif type(tag_list) == TagList:
         return tag_list
     else:
@@ -666,14 +1080,19 @@ def convert_to_TagList(tag_list, dataserver=None):
             return TagList(tag_list)
         except:
             if dataserver:
-                 return dataserver.find_tags(tag_list)
+                return dataserver.find_tags(tag_list)
             else:
-                 raise AttributeError('Please specifiy a dataserver when using tags in string format')
+                raise AttributeError(
+                    "Please specifiy a dataserver when using tags in string format"
+                )
+
 
 def view(dataframe):
-    '''returns string/float version of dataframe that can be viewed in the variable console'''
-    dataframe = dataframe.copy() #needs to return a copy
-    for colname in dataframe.loc[:, ~dataframe.columns.isin(['Starttime','Endtime'])]:
+    """returns string/float version of dataframe that can be viewed in the variable console"""
+    dataframe = dataframe.copy()  # needs to return a copy
+    for colname in dataframe.loc[
+        :, ~dataframe.columns.isin(["Starttime", "Endtime"])
+    ]:
         dataframe[colname] = dataframe[colname].astype(str)
         try:
             dataframe[colname] = dataframe[colname].astype(float)

@@ -1,11 +1,11 @@
-""" JanssenPI
+""" PIConnect
     Connector to the OSISoft PI and PI-AF databases.
 """
 # pragma pylint: disable=unused-import
-from JanssenPI.AFSDK import AF, AF_SDK_VERSION
-from JanssenPI.config import PIConfig
-from JanssenPI.PI import PIServer
-from JanssenPI.PIAF import PIAFDatabase
+from PIconnect.AFSDK import AF, AF_SDK_VERSION
+from PIconnect.config import PIConfig
+from PIconnect.PI import PIServer
+from PIconnect.PIAF import PIAFDatabase
 
 # pragma pylint: enable=unused-import
 
