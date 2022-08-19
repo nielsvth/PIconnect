@@ -482,6 +482,29 @@ class Tag:
             df = pd.DataFrame()
         return df
 
+    def _parseSummaryResult(self, result: SummaryType) -> pd.DataFrame:
+        """Parse a Summary result and return a dataframe.
+
+        Args:
+            res (SummaryType): Summary to parse
+
+        Returns:
+            pd.DataFrame: resulting dataframe
+        """
+        # summary
+        df_final = pd.DataFrame()
+        for x in result:  # per summary
+            summary = SummaryType(x.Key).name
+            value = x.Value
+            timestamp = timestamp_to_index(x.Value.Timestamp.UtcTime)
+            df = pd.DataFrame(
+                [[summary, value, timestamp]],
+                columns=["Summary", "Value", "Timestamp"],
+            )
+            df_final = df_final.append(df, ignore_index=True)
+
+        return df_final
+
     # CalculationBasis.EVENT_WEIGHTED avoids issues(?) with interpolation:
     # ref. #Issue 1
     def summary(
@@ -540,16 +563,7 @@ class Tag:
             AFTimeRange, summary_types, calculation_basis, time_type
         )
 
-        df_final = pd.DataFrame()
-        for x in result:  # per summary
-            summary = SummaryType(x.Key).name
-            value = x.Value
-            timestamp = timestamp_to_index(x.Value.Timestamp.UtcTime)
-            df = pd.DataFrame(
-                [[summary, value, timestamp]],
-                columns=["Summary", "Value", "Timestamp"],
-            )
-            df_final = df_final.append(df, ignore_index=True)
+        df_final = self._parseSummaryResult(result)
 
         return df_final
 
@@ -616,18 +630,9 @@ class Tag:
             time_type,
         )
 
-        df_final = pd.DataFrame()
-        for x in result:  # per summary
-            summary = SummaryType(x.Key).name
-            values = [
-                (timestamp_to_index(value.Timestamp.UtcTime), value.Value)
-                for value in x.Value
-            ]
-            df = pd.DataFrame(values, columns=["Timestamp", "Value"])
-            df["Summary"] = summary
-            df_final = df_final.append(df, ignore_index=True)
+        df_final = self._parseSummaryResult(result)
 
-        return df_final[["Summary", "Timestamp", "Value"]]
+        return df_final
 
     def filtered_summaries(
         self,
@@ -706,26 +711,9 @@ class Tag:
             time_type,
         )
 
-        df_final = pd.DataFrame()
-        for x in result:  # per summary
-            summary = SummaryType(x.Key).name
-            values = [
-                (timestamp_to_index(value.Timestamp.UtcTime), value.Value)
-                for value in x.Value
-            ]
-            df = pd.DataFrame(values, columns=["Timestamp", "Value"])
-            df["Summary"] = summary
-            df_final = df_final.append(df, ignore_index=True)
+        df_final = self._parseSummaryResult(result)
 
-        out = df_final[
-            [
-                "Summary",
-                "Value",
-                "Timestamp",
-            ]
-        ]
-
-        return out
+        return df_final
 
 
 class TagList(UserList):
