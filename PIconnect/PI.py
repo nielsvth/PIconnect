@@ -732,20 +732,12 @@ class TagList(UserList):
     @staticmethod
     def validate(data):
         """Validate input meets requirements for TagList"""
-        try:
-            for tag in data:
-                if type(tag) == Tag:
-                    pass
-                else:
-                    raise AttributeError(
-                        "Can not convert tag of type {} to TagList object".format(
-                            type(tag)
-                        )
-                    )
-        except:
-            raise AttributeError(
-                "Can not convert this type of input to TagList object"
-            )
+        for tag in data:
+            if not isinstance(tag, Tag):
+                raise AttributeError(
+                    f"Can not convert tag of type "
+                    + f"{type(tag)} to TagList object"
+                )
 
     def current_values(self):
         """Return Dataframe of current values per tag"""

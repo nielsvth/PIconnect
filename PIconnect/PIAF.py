@@ -42,12 +42,12 @@ except ImportError:
 # pragma pylint: enable=unused-import, redefined-builtin
 from warnings import warn
 
-from JanssenPI._utils import classproperty
-from JanssenPI.AFSDK import AF
-from JanssenPI.PIConsts import EventFrameSearchMode, SearchMode, SortField, SortOrder, SummaryType, CalculationBasis, TimestampCalculation, BoundaryType, ExpressionSampleType, SearchField
-from JanssenPI.time import timestamp_to_index, add_timezone
-from JanssenPI.config import PIConfig
-from JanssenPI.PI import Tag, generate_pipointlist, convert_to_TagList
+from PIconnect._utils import classproperty
+from PIconnect.AFSDK import AF
+from PIconnect.PIConsts import EventFrameSearchMode, SearchMode, SortField, SortOrder, SummaryType, CalculationBasis, TimestampCalculation, BoundaryType, ExpressionSampleType, SearchField
+from PIconnect.time import timestamp_to_index, add_timezone
+from PIconnect.config import PIConfig
+from PIconnect.PI import Tag, generate_pipointlist, convert_to_TagList
 
 from pytz import timezone, utc
 from datetime import datetime, timedelta
