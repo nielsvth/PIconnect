@@ -739,20 +739,45 @@ class TagList(UserList):
                     + f"{type(tag)} to TagList object"
                 )
 
-    def current_values(self):
-        """Return Dataframe of current values per tag"""
+    def current_values(self) -> pd.DataFrame:
+        """Getter method for current values of all tags in list
+
+        Returns:
+            pd.DataFrame: values of all tags with names as the column
+        """
         PIPointlist = generate_pipointlist(self)
         result = PIPointlist.CurrentValue()
         if result:
             values = [x.Value for x in result]
             tags = [x.PIPoint.Name for x in result]
-            return pd.DataFrame([values], columns=tags)
+            out = pd.DataFrame([values], columns=tags)
         else:
-            return pd.DataFrame
+            out = pd.DataFrame()
+        return out
 
-    def plot_values(self, starttime, endtime, nr_of_intervals):
-        """Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels)
-        Returns a Dictionary of DataFrames for Tags in Taglist with values that will produce the most accurate plot over the time range while minimizing the amount of data returned"""
+    # TODO: convert this to simply calling Tag.plot_values() if possible
+    def plot_values(
+        self,
+        starttime: Union[str, datetime.datetime],
+        endtime: Union[str, datetime.datetime],
+        nr_of_intervals: int,
+    ) -> pd.DataFrame:
+        """Retrieves values over the specified time range suitable for plotting
+        over the number of intervals (typically represents pixels).Returns a
+        Dictionary of DataFrames for Tags in Taglist with values that will produce
+        the most accurate plot over the time range while minimizing the amount of
+        data returned
+
+        Args:
+            starttime (Union[str, datetime.datetime]): start time
+            endtime (Union[str, datetime.datetime]): end time
+            nr_of_intervals (int): Number of intervals
+
+        Returns:
+            pd.DataFrame: Dataframe with values that will produce the most
+            accurate plot over the time range while minimizing the amount
+            of data returned
+        """
         AFTimeRange = to_af_time_range(starttime, endtime)
         PIPointlist = generate_pipointlist(self)
 
@@ -783,6 +808,7 @@ class TagList(UserList):
         else:
             return dict()
 
+    # TODO: pass to underlying Tag function
     def interpolated_values(
         self, starttime, endtime, interval, filter_expression=""
     ):
@@ -817,6 +843,7 @@ class TagList(UserList):
         else:  # if no result, return empty dataframe
             return pd.DataFrame()
 
+    # TODO: pass to underlying tag function
     def recorded_values(
         self,
         starttime,
@@ -860,6 +887,7 @@ class TagList(UserList):
         else:  # if no result, return empty dictionary
             return dict()
 
+    # TODO: pass to underlying Tag function
     def summary(
         self,
         starttime,
@@ -918,6 +946,7 @@ class TagList(UserList):
         else:
             return pd.DataFrame()
 
+    # TODO: pass to underlying Tag function
     def summaries(
         self,
         starttime,
@@ -972,6 +1001,7 @@ class TagList(UserList):
         else:
             return pd.DataFrame()
 
+    # TODO: pass to underlying Tag function
     def filtered_summaries(
         self,
         starttime,
@@ -1037,10 +1067,11 @@ class TagList(UserList):
 
 # aux functions
 
-
-def generate_pipointlist(tag_list):
+# TODO: This should be converted to a staticmethod for the TagList class.
+# TODO: Define the output type of this.
+def generate_pipointlist(tag_list: TagList):
     """Generate and populate object of PIPointList class from TagList object"""
-    if not type(tag_list) == TagList:
+    if not isinstance(tag_list, TagList):
         raise Exception("Input is not a TagList object")
 
     PIPointlist = AF.PI.PIPointList()
@@ -1049,6 +1080,8 @@ def generate_pipointlist(tag_list):
     return PIPointlist
 
 
+# TODO: This should be converted to a staticmethod for the TagList class.
+# TODO: Define the output type of this.
 def convert_to_TagList(tag_list, dataserver=None):
     """Convert list of strings OR list of Tag objects to Taglist"""
     if type(tag_list) == str:
@@ -1067,6 +1100,7 @@ def convert_to_TagList(tag_list, dataserver=None):
                 )
 
 
+# Can't the user can simply use iPyKernel's display func, e.g. display(df)
 def view(dataframe):
     """returns string/float version of dataframe that can be viewed in the variable console"""
     dataframe = dataframe.copy()  # needs to return a copy
