@@ -10,7 +10,9 @@ class PIConfigContainer:
         import pytz
 
         if value not in pytz.all_timezones:
-            raise ValueError("{v!r} not found in pytz.all_timezones".format(v=value))
+            raise ValueError(
+                "{v!r} not found in pytz.all_timezones".format(v=value)
+            )
         self._default_timezone = value
 
 

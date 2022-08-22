@@ -2,7 +2,12 @@
     Loads the .NET libraries from the OSIsoft AF SDK
 """
 # pragma pylint: disable=unused-import
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (
+    absolute_import,
+    division,
+    print_function,
+    unicode_literals,
+)
 
 import os
 
@@ -39,7 +44,9 @@ try:
     PIAF_SDK = os.getenv("PIHOME", "C:\\Program Files\\PIPC")
     PIAF_SDK += "\\AF\\PublicAssemblies\\4.0\\"
     if not os.path.isdir(PIAF_SDK):
-        raise ImportError("PIAF SDK not found in %s, check installation" % PIAF_SDK)
+        raise ImportError(
+            "PIAF SDK not found in %s, check installation" % PIAF_SDK
+        )
 
     sys.path.append(PIAF_SDK)
     clr.AddReference("OSIsoft.AFSDK")  # pylint: disable=no-member
@@ -52,9 +59,12 @@ except ImportError:
     import enum
     import warnings
 
-    warnings.warn("Can't import the PI AF SDK, running in test mode", ImportWarning)
+    warnings.warn(
+        "Can't import the PI AF SDK, running in test mode", ImportWarning
+    )
     AF_SDK_VERSION = "2.7_compatible"
-    # pragma pylint: disable=invalid-name, unused-argument, too-few-public-methods
+    # pragma pylint: disable=invalid-name, unused-argument, too-few-public-methods # noqa
+
     class AF:
         """Mock class of the AF namespace"""
 
@@ -181,7 +191,8 @@ except ImportError:
 
                 @staticmethod
                 def Parse(interval):
-                    """Stub for parsing strings that should return a AFTimeSpan"""
+                    """Stub for parsing strings that should return a
+                    AFTimeSpan"""
                     return AF.Time.AFTimeSpan()
 
-    # pragma pylint: enable=invalid-name, unused-argument, too-few-public-methods
+    # pragma pylint: enable=invalid-name, unused-argument, too-few-public-methods # noqa
