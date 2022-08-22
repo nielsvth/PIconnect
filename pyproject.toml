@@ -11,6 +11,6 @@ addopts = "-ra --durations=0 --cov-report xml:coverage.xml --cov PIconnect"
 profile = "black"
 
 [tool.black]
-line-length = 88
+line-length = 79
 target-version = ['py36', 'py37', 'py38', 'py39']
 include = '\.pyi?$'
