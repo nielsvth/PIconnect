@@ -69,6 +69,8 @@ The following tutorial elaborates on the Asset class and some of its key attribu
 
 .. code-block:: python
 
+    from datetime import datetime
+
     # Returns list of Assets that meets the query criteria
     # Here a query is executed for an Asset with name '091_R022'
     # For more info on how to construct queries, see further
@@ -90,8 +92,11 @@ The following tutorial elaborates on the Asset class and some of its key attribu
     events = asset.get_events(
         start_time="*-50d", end_time="*", template_name="Phase"
     )
+    # Using datetime to avoid US vs. EU date confusion
+    start_date = datetime(day=1, month=3, year=2022)
+    end_date = datetime(day=31, month=3, year=2022)
     events = asset.get_events(
-        start_time="01/03/2022", end_time="31/03/2022", template_name="Phase"
+        start_time=start_date, end_time=end_date, template_name="Phase"
     )
 
 
