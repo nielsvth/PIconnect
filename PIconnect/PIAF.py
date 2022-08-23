@@ -79,6 +79,393 @@ from System import Exception as dotNetException  # type: ignore # noqa: E402
 _NOTHING = object()
 
 
+# TODO: This appears to need some work. E.g. Validate method. i'm not
+# convinced the repr method will work.
+class EventList(UserList):
+    """Container for EventList object"""
+
+    def __init__(self, data):
+        self.data = data  # list of Events
+        # validation step---
+
+    def __repr__(self):
+        return str([event for event in self.data])
+
+    def __str__(self):
+        return str([event for event in self.data])
+
+    # Methods
+    def to_set(self):
+        """Return eventlist as set"""
+        return set(self.data)
+
+    def get_event_hierarchy(self, depth=10):
+        """Return EventHierarchy down to the specified depth"""
+        # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_AFNamedCollectionList_1.htm
+        afcontainer = AF.AFNamedCollectionList[
+            AF.EventFrame.AFEventFrame
+        ]()  # empty container
+        for event in self.data:
+            try:
+                afcontainer.Add(event.af_eventframe)
+            except:
+                raise ("Failed to process event {}".format(event))
+
+        if len(afcontainer) > 0:
+            df_procedures = pd.DataFrame(
+                [(y, y.GetPath()) for y in afcontainer],
+                columns=["Event", "Path"],
+            )
+
+            print(
+                "Fetching hierarchy data for {} Event(s)...".format(
+                    len(afcontainer)
+                )
+            )
+            # https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_EventFrame_AFEventFrame_LoadEventFramesToDepth.htm
+            event_depth = AF.EventFrame.AFEventFrame.LoadEventFramesToDepth(
+                afcontainer, False, depth, 1000000
+            )
+
+            if len(event_depth) > 0:
+                df_events = pd.DataFrame(
+                    [(y, y.GetPath()) for y in event_depth],
+                    columns=["Event", "Path"],
+                )
+            else:
+                df_events = pd.DataFrame()
+
+            # concatenate procedures and child event frames
+            df_events = pd.concat(
+                [df_procedures, df_events], ignore_index=True
+            )
+
+            df_events["Event"] = df_events["Event"].apply(lambda x: Event(x))
+            df_events["Name"] = df_events["Event"].apply(
+                lambda x: x.name if x else np.nan
+            )
+            df_events["Template"] = df_events["Event"].apply(
+                lambda x: x.template_name if x.af_template else np.nan
+            )
+            df_events["Level"] = (
+                df_events["Path"].str.count(r"\\").apply(lambda x: x - 4)
+            )
+            df_events["Starttime"] = df_events["Event"].apply(
+                lambda x: x.starttime if x else np.nan
+            )
+            df_events["Endtime"] = df_events["Event"].apply(
+                lambda x: x.endtime if x else np.nan
+            )
+
+            print(
+                "This Event Hierarchy has structure of "
+                + '"\\\\Server\\Database\\{}"'.format(
+                    "\\".join(
+                        [str(ev) for ev in df_events["Template"].unique()]
+                    )
+                )
+            )  # not completely correct if different templates on a single
+            # level
+            return df_events
+
+        else:
+            return pd.DataFrame(
+                columns=[
+                    "Event",
+                    "Path",
+                    "Name",
+                    "Level",
+                    "Template",
+                    "Starttime",
+                    "Endtime",
+                ]
+            )
+
+
+class Asset:
+    """Container for Event object"""
+
+    # TODO: isn't it for the Asset object?
+
+    def __init__(self, asset):
+        self.asset = asset
+
+    def __repr__(self):
+        return "Asset:" + self.asset.GetPath()
+
+    def __str__(self):
+        return "Asset:" + self.asset.GetPath()
+
+    # Properties
+    @property
+    def name(self):
+        """Return name of Asset"""
+        return self.asset.Name
+
+    @property
+    def path(self):
+        """Return path"""
+        return self.asset.GetPath()
+
+    @property
+    def pisystem_name(self):
+        """Return PISystem name"""
+        return self.asset.PISystem.Name
+
+    @property
+    def database_name(self):
+        """Return database name"""
+        return self.asset.Database.Name
+
+    @property
+    def database(self):
+        """Return PIAFDatabase object"""
+        return PIAFDatabase(
+            server=self.pisystem_name, database=self.database_name
+        )
+
+    @property
+    def af_asset(self):
+        """Return AFEventFrame object"""
+        return self.asset
+
+    @property
+    def af_template(self):
+        """Return AFTemplate"""
+        return self.asset.Template
+
+    @property
+    def template_name(self):
+        """Return template name"""
+        if self.asset.Template:
+            return self.asset.Template.Name
+        else:
+            return None
+
+    @property
+    def attributes(self):
+        """'Return list of attribute names for Asset"""
+        return [attribute.Name for attribute in self.asset.Attributes]
+
+    @property
+    def af_attributes(self):
+        """'Return list of AFAttributes for Asset"""
+        return [attribute for attribute in self.asset.Attributes]
+
+    def children(self):
+        """Return List of children for Asset"""
+        return list([Asset(asset) for asset in self.asset.children])
+
+    @property
+    def parent(self):
+        """Return parent Asset for Asset"""
+        return Asset(self.asset.Parent)
+
+    @property
+    def description(self):
+        """Return description for Asset"""
+        return self.asset.Description
+
+    # methods
+    def get_attribute_values(
+        self,
+        attribute_names_list: Union[None, List[AF.Asset.AFAttribute]] = None,
+    ) -> Dict[str, float]:
+        """Get attribute values for specified attributes
+
+        Args:
+            attribute_names_list (Union[None, List[AF.Asset.AFAttribute]],
+                optional): List of Attributes to query. If None, will do all
+                attributes within the Event. Defaults to None.
+
+        Returns:
+            Dict[str, float]: attribute Name: attribute value
+        """
+        if attribute_names_list is None:
+            attribute_names_list = self.eventframe.Attributes
+
+        attribute_dct = {
+            attribute.Name: attribute.GetValue().Value
+            for attribute in attribute_names_list
+            if attribute.Name in self.eventframe.Attributes
+        }
+
+        return attribute_dct
+
+    def get_events(
+        self,
+        query: str = None,
+        start_time: Union[str, datetime] = None,
+        end_time: Union[str, datetime] = "*",
+        template_name: str = None,
+        start_index: int = 0,
+        max_count: int = 1000000,
+        search_mode: SearchMode = SearchMode.OVERLAPPED,
+        search_full_hierarchy: bool = True,
+        sortField: SortField = SortField.STARTTIME,
+        sortOrder: SortOrder = SortOrder.ASCENDING,
+    ) -> EventList:
+        """Return EventList of Events on Asset within specified time period
+        that meets the query criteria
+
+        Args:
+            query (str, optional): string to query by. Defaults to None.
+            start_time (Union[str, datetime], optional): Time to
+                start search at. Defaults to None.
+            end_time (Union[str, datetime], optional): Time to end
+                search at. Defaults to "*".
+            template_name (str, optional): Template to search.
+                Defaults to None.
+            start_index (int, optional): Start Index. Defaults to 0.
+            max_count (int, optional): Max Count. Defaults to 1000000.
+            search_mode (SearchMode, optional): Search Mode.
+                Defaults to SearchMode.OVERLAPPED.
+            search_full_hierarchy (bool, optional): Boolean for whether to
+                search full hierarchy or not. Defaults to True.
+            sortField (SortField, optional): Sorting field.
+                Defaults to SortField.STARTTIME.
+            sortOrder (SortOrder, optional): Sort order.
+                Defaults to SortOrder.ASCENDING.
+
+        Returns:
+            EventList: Results of events
+        """
+        asset = self.name
+        return self.database.find_events(
+            query,
+            asset,
+            start_time,
+            end_time,
+            template_name,
+            start_index,
+            max_count,
+            search_mode,
+            search_full_hierarchy,
+            sortField,
+            sortOrder,
+        )
+
+
+try:
+    # delete the accessor to avoid warning
+    # TODO: same question as above
+    del pd.DataFrame.ahy
+except AttributeError:
+    pass
+
+
+@pd.api.extensions.register_dataframe_accessor("ahy")
+class AssetHierarchy:
+    """Additional functionality for pd.DataFrame object, for working with
+    AssetHierarchies"""
+
+    def __init__(self, df):
+        self.validate(df)
+        self.df = df
+
+    @staticmethod
+    def validate(df):
+        """Validate object meets requirements for EventHierarchy"""
+        # verify that dataframe fits EventHierarchy requirements
+        if not {"Asset", "Path", "Name", "Template", "Level"}.issubset(
+            set(df.columns)
+        ):
+            raise AttributeError(
+                "This dataframe does not have the correct AssetHierarchy "
+                + "format"
+            )
+
+    # methods
+    def add_attributes(
+        self,
+        attribute_names_list: List[AF.Asset.AFAttribute],
+        level: int,
+    ) -> pd.DataFrame:
+        """Add attributtes to AssetHierarchy for specified attributes and
+        level
+
+        Args:
+            attribute_names_list (List[AF.Asset.AFAttribute]):  List of
+                Attributes to query.
+            level (int): level to query to
+
+        Returns:
+            pd.DataFrame: self
+        """
+        print("Fetching attribute(s)...")
+
+        for attribute in attribute_names_list:
+            self.df[attribute + " [" + str(level) + "]"] = self.df.loc[
+                self.df["Level"] == level, "Event"
+            ].apply(lambda x: x.get_attribute_values([attribute])[attribute])
+
+        for colname in self.df.columns:
+            try:
+                self.df[colname] = self.df[colname].astype(float)
+            except:
+                pass
+        return self.df
+
+    def condense(self) -> pd.DataFrame:
+        """Condense the AssetHierarchy object to return a condensed,
+        vertically layered representation of the Asset Tree
+
+        Returns:
+            pd.DataFrame: Condensed dataframe
+        """
+        print("Condensing...")
+
+        df = self.df.copy()
+        # merge level by level
+        for level in range(int(df["Level"].min()), int(df["Level"].max() + 1)):
+            # subdf per level
+            df_level = df[df["Level"] == level]
+            # remove empty columns
+            df_level.dropna(how="all", axis=1, inplace=True)
+            if df_level.empty:
+                df_condensed[level] = "TempValue"
+            else:
+                # add auxiliary columns for merge based on path
+                cols = [x for x in range(level + 1)]
+                df_level[cols] = (
+                    df_level["Path"].str.split("\\", expand=True).loc[:, 4:]
+                )
+                # remove Path columns
+                df_level.drop(["Path"], 1, inplace=True)
+                # rename columns, ignore columns with number names
+                df_level.columns = [
+                    col_name + " [" + str(int(level)) + "]"
+                    if not ((type(col_name) == int) or ("[" in col_name))
+                    else col_name
+                    for col_name in df_level.columns
+                ]
+                # merge with previous level
+                if level == int(df["Level"].min()):
+                    df_condensed = df_level
+                else:
+                    df_condensed = pd.merge(
+                        df_condensed,
+                        df_level,
+                        how="outer",
+                        left_on=cols[:-1],
+                        right_on=cols[:-1],
+                    )
+        # drop auxiliary columns
+        df_condensed.drop(
+            [
+                col_name
+                for col_name in df_condensed.columns
+                if type(col_name) == int
+            ],
+            1,
+            inplace=True,
+        )
+        # remove duplicates
+        df_condensed = df_condensed.drop_duplicates(keep="first")
+
+        return df_condensed
+
+
 class PIAFDatabase(object):
     """PIAFDatabase
 
@@ -217,8 +604,8 @@ class PIAFDatabase(object):
         self,
         query: str = None,
         asset: str = "*",
-        start_time: Union[str, datetime.datetime] = None,
-        end_time: Union[str, datetime.datetime] = "*",
+        start_time: Union[str, datetime] = None,
+        end_time: Union[str, datetime] = "*",
         template_name: str = None,
         start_index: int = 0,
         max_count: int = 1000000,
@@ -232,9 +619,9 @@ class PIAFDatabase(object):
         Args:
             query (str, optional): string to query by. Defaults to None.
             asset (str, optional): asset to search. Defaults to "*".
-            start_time (Union[str, datetime.datetime], optional): Time to
+            start_time (Union[str, datetime], optional): Time to
                 start search at. Defaults to None.
-            end_time (Union[str, datetime.datetime], optional): Time to end
+            end_time (Union[str, datetime], optional): Time to end
                 search at. Defaults to "*".
             template_name (str, optional): Template to search.
                 Defaults to None.
@@ -538,7 +925,7 @@ class Event:
         tag_list: List[Union[str, Tag]],
         nr_of_intervals: int,
         dataserver: PIServer = None,
-    ) -> Dict[pd.DataFrame]:
+    ) -> Dict[str, pd.DataFrame]:
         """Retrieves values over the specified time range suitable for
         plotting over the number of intervals (typically represents pixels).
         Returns a Dictionary of DataFrames for Tags in Taglist with values
@@ -555,9 +942,7 @@ class Event:
                 is strings. Defaults to None.
 
         Returns:
-            Dict[pd.DataFrame]: Dictionary of Dataframes with values that
-            will produce the most accurate plot over the time range while
-            minimizing the amount of data returned
+            Dict[str, pd.DataFrame]: tagName: requested dataframe
         """
         taglist = convert_to_TagList(tag_list, dataserver)
         return taglist.plot_values(
@@ -601,7 +986,7 @@ class Event:
         dataserver: PIServer = None,
         filter_expression: str = "",
         AFBoundaryType: BoundaryType = BoundaryType.INSIDE,
-    ) -> Dict[pd.DataFrame]:
+    ) -> Dict[str, pd.DataFrame]:
         """Retrieve recorded values for each Tag in TagList within the event
 
         Args:
@@ -614,8 +999,7 @@ class Event:
                 Defaults to BoundaryType.INSIDE.
 
         Returns:
-            Dict[pd.DataFrame]: dictionary of Dataframes of recorded values
-                for Tags in TagList
+            Dict[str, pd.DataFrame]: tagName: dataframe of requested values
         """
         taglist = convert_to_TagList(tag_list, dataserver)
         return taglist.recorded_values(
@@ -823,7 +1207,7 @@ class Event:
     def get_attribute_values(
         self,
         attribute_names_list: Union[None, List[AF.Asset.AFAttribute]] = None,
-    ) -> Dict:
+    ) -> Dict[str, float]:
         """Get attribute values for specified attributes
 
         Args:
@@ -832,7 +1216,7 @@ class Event:
                 attributes within the Event. Defaults to None.
 
         Returns:
-            Dict: attribute Name: attribute value
+            Dict[str, float]: attribute Name: attribute value
         """
         if attribute_names_list is None:
             attribute_names_list = self.eventframe.Attributes
@@ -907,109 +1291,6 @@ class Event:
             )
         )  # not really correct when different templates on a level
         return df_events
-
-
-# TODO: This appears to need some work. E.g. Validate method. i'm not
-# convinced the repr method will work.
-class EventList(UserList):
-    """Container for EventList object"""
-
-    def __init__(self, data):
-        self.data = data  # list of Events
-        # validation step---
-
-    def __repr__(self):
-        return str([event for event in self.data])
-
-    def __str__(self):
-        return str([event for event in self.data])
-
-    # Methods
-    def to_set(self):
-        """Return eventlist as set"""
-        return set(self.data)
-
-    def get_event_hierarchy(self, depth=10):
-        """Return EventHierarchy down to the specified depth"""
-        # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_AFNamedCollectionList_1.htm
-        afcontainer = AF.AFNamedCollectionList[
-            AF.EventFrame.AFEventFrame
-        ]()  # empty container
-        for event in self.data:
-            try:
-                afcontainer.Add(event.af_eventframe)
-            except:
-                raise ("Failed to process event {}".format(event))
-
-        if len(afcontainer) > 0:
-            df_procedures = pd.DataFrame(
-                [(y, y.GetPath()) for y in afcontainer],
-                columns=["Event", "Path"],
-            )
-
-            print(
-                "Fetching hierarchy data for {} Event(s)...".format(
-                    len(afcontainer)
-                )
-            )
-            # https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_EventFrame_AFEventFrame_LoadEventFramesToDepth.htm
-            event_depth = AF.EventFrame.AFEventFrame.LoadEventFramesToDepth(
-                afcontainer, False, depth, 1000000
-            )
-
-            if len(event_depth) > 0:
-                df_events = pd.DataFrame(
-                    [(y, y.GetPath()) for y in event_depth],
-                    columns=["Event", "Path"],
-                )
-            else:
-                df_events = pd.DataFrame()
-
-            # concatenate procedures and child event frames
-            df_events = pd.concat(
-                [df_procedures, df_events], ignore_index=True
-            )
-
-            df_events["Event"] = df_events["Event"].apply(lambda x: Event(x))
-            df_events["Name"] = df_events["Event"].apply(
-                lambda x: x.name if x else np.nan
-            )
-            df_events["Template"] = df_events["Event"].apply(
-                lambda x: x.template_name if x.af_template else np.nan
-            )
-            df_events["Level"] = (
-                df_events["Path"].str.count(r"\\").apply(lambda x: x - 4)
-            )
-            df_events["Starttime"] = df_events["Event"].apply(
-                lambda x: x.starttime if x else np.nan
-            )
-            df_events["Endtime"] = df_events["Event"].apply(
-                lambda x: x.endtime if x else np.nan
-            )
-
-            print(
-                "This Event Hierarchy has structure of "
-                + '"\\\\Server\\Database\\{}"'.format(
-                    "\\".join(
-                        [str(ev) for ev in df_events["Template"].unique()]
-                    )
-                )
-            )  # not completely correct if different templates on a single
-            # level
-            return df_events
-
-        else:
-            return pd.DataFrame(
-                columns=[
-                    "Event",
-                    "Path",
-                    "Name",
-                    "Level",
-                    "Template",
-                    "Starttime",
-                    "Endtime",
-                ]
-            )
 
 
 try:
@@ -1649,7 +1930,7 @@ class CondensedEventHierarchy:
         filter_expression="",
         AFBoundaryType: BoundaryType = BoundaryType.INTERPOLATED,
         dataserver: PIServer = None,
-    ) -> Dict[Dict]:
+    ) -> Dict[str, Dict[str, pd.DataFrame]]:
         """Return nested dictionary (level 1: Procedures, Level 2: Tags) of
         recorded data extracts from the start of the first filtered event to
         the end of the last filtered event, for each procedure, on bottom
@@ -1665,7 +1946,8 @@ class CondensedEventHierarchy:
                 is strings. Defaults to None.
 
         Returns:
-            Dict[Dict]: nested dictionary (level 1: Procedures, Level 2: Tags)
+            Dict[str, Dict[str, pd.DataFrame]]: nested dictionary
+                ProcedureName: {tagName: tagData}
         """
         taglist = convert_to_TagList(tag_list, dataserver)
 
@@ -1720,7 +2002,7 @@ class CondensedEventHierarchy:
         tag_list: List[Union[str, Tag]],
         nr_of_intervals: int,
         dataserver: PIServer = None,
-    ) -> Dict[Dict]:
+    ) -> Dict[str, Dict[str, pd.DataFrame]]:
         """Return nested dictionary (level 1: Procedures, Level 2: Tags) of
         continuous plot values from the start of the first filtered event to
         the end of the last filtered event for each procedure on bottom level
@@ -1736,7 +2018,8 @@ class CondensedEventHierarchy:
                 is strings. Defaults to None.
 
         Returns:
-            Dict[Dict]: dictionary (level 1: Procedures, Level 2: Tags)
+            Dict[str,Dict[str,pd.DataFrame]]:  nested dictionary
+                ProcedureName: {tagName: tagData}
         """
         taglist = convert_to_TagList(tag_list, dataserver)
 
@@ -1942,287 +2225,3 @@ class CondensedEventHierarchy:
         df.reset_index(drop=True, inplace=True)
 
         return df
-
-
-class Asset:
-    """Container for Event object"""
-
-    # TODO: isn't it for the Asset object?
-
-    def __init__(self, asset):
-        self.asset = asset
-
-    def __repr__(self):
-        return "Asset:" + self.asset.GetPath()
-
-    def __str__(self):
-        return "Asset:" + self.asset.GetPath()
-
-    # Properties
-    @property
-    def name(self):
-        """Return name of Asset"""
-        return self.asset.Name
-
-    @property
-    def path(self):
-        """Return path"""
-        return self.asset.GetPath()
-
-    @property
-    def pisystem_name(self):
-        """Return PISystem name"""
-        return self.asset.PISystem.Name
-
-    @property
-    def database_name(self):
-        """Return database name"""
-        return self.asset.Database.Name
-
-    @property
-    def database(self):
-        """Return PIAFDatabase object"""
-        return PIAFDatabase(
-            server=self.pisystem_name, database=self.database_name
-        )
-
-    @property
-    def af_asset(self):
-        """Return AFEventFrame object"""
-        return self.asset
-
-    @property
-    def af_template(self):
-        """Return AFTemplate"""
-        return self.asset.Template
-
-    @property
-    def template_name(self):
-        """Return template name"""
-        if self.asset.Template:
-            return self.asset.Template.Name
-        else:
-            return None
-
-    @property
-    def attributes(self):
-        """'Return list of attribute names for Asset"""
-        return [attribute.Name for attribute in self.asset.Attributes]
-
-    @property
-    def af_attributes(self):
-        """'Return list of AFAttributes for Asset"""
-        return [attribute for attribute in self.asset.Attributes]
-
-    def children(self):
-        """Return List of children for Asset"""
-        return list([Asset(asset) for asset in self.asset.children])
-
-    @property
-    def parent(self):
-        """Return parent Asset for Asset"""
-        return Asset(self.asset.Parent)
-
-    @property
-    def description(self):
-        """Return description for Asset"""
-        return self.asset.Description
-
-    # methods
-    def get_attribute_values(
-        self,
-        attribute_names_list: Union[None, List[AF.Asset.AFAttribute]] = None,
-    ) -> Dict:
-        """Get attribute values for specified attributes
-
-        Args:
-            attribute_names_list (Union[None, List[AF.Asset.AFAttribute]],
-                optional): List of Attributes to query. If None, will do all
-                attributes within the Event. Defaults to None.
-
-        Returns:
-            Dict: attribute Name: attribute value
-        """
-        if attribute_names_list is None:
-            attribute_names_list = self.eventframe.Attributes
-
-        attribute_dct = {
-            attribute.Name: attribute.GetValue().Value
-            for attribute in attribute_names_list
-            if attribute.Name in self.eventframe.Attributes
-        }
-
-        return attribute_dct
-
-    def get_events(
-        self,
-        query: str = None,
-        start_time: Union[str, datetime.datetime] = None,
-        end_time: Union[str, datetime.datetime] = "*",
-        template_name: str = None,
-        start_index: int = 0,
-        max_count: int = 1000000,
-        search_mode: SearchMode = SearchMode.OVERLAPPED,
-        search_full_hierarchy: bool = True,
-        sortField: SortField = SortField.STARTTIME,
-        sortOrder: SortOrder = SortOrder.ASCENDING,
-    ) -> EventList:
-        """Return EventList of Events on Asset within specified time period
-        that meets the query criteria
-
-        Args:
-            query (str, optional): string to query by. Defaults to None.
-            start_time (Union[str, datetime.datetime], optional): Time to
-                start search at. Defaults to None.
-            end_time (Union[str, datetime.datetime], optional): Time to end
-                search at. Defaults to "*".
-            template_name (str, optional): Template to search.
-                Defaults to None.
-            start_index (int, optional): Start Index. Defaults to 0.
-            max_count (int, optional): Max Count. Defaults to 1000000.
-            search_mode (SearchMode, optional): Search Mode.
-                Defaults to SearchMode.OVERLAPPED.
-            search_full_hierarchy (bool, optional): Boolean for whether to
-                search full hierarchy or not. Defaults to True.
-            sortField (SortField, optional): Sorting field.
-                Defaults to SortField.STARTTIME.
-            sortOrder (SortOrder, optional): Sort order.
-                Defaults to SortOrder.ASCENDING.
-
-        Returns:
-            EventList: Results of events
-        """
-        asset = self.name
-        return self.database.find_events(
-            query,
-            asset,
-            start_time,
-            end_time,
-            template_name,
-            start_index,
-            max_count,
-            search_mode,
-            search_full_hierarchy,
-            sortField,
-            sortOrder,
-        )
-
-
-try:
-    # delete the accessor to avoid warning
-    # TODO: same question as above
-    del pd.DataFrame.ahy
-except AttributeError:
-    pass
-
-
-@pd.api.extensions.register_dataframe_accessor("ahy")
-class AssetHierarchy:
-    """Additional functionality for pd.DataFrame object, for working with
-    AssetHierarchies"""
-
-    def __init__(self, df):
-        self.validate(df)
-        self.df = df
-
-    @staticmethod
-    def validate(df):
-        """Validate object meets requirements for EventHierarchy"""
-        # verify that dataframe fits EventHierarchy requirements
-        if not {"Asset", "Path", "Name", "Template", "Level"}.issubset(
-            set(df.columns)
-        ):
-            raise AttributeError(
-                "This dataframe does not have the correct AssetHierarchy "
-                + "format"
-            )
-
-    # methods
-    def add_attributes(
-        self,
-        attribute_names_list: List[AF.Asset.AFAttribute],
-        level: int,
-    ) -> pd.DataFrame:
-        """Add attributtes to AssetHierarchy for specified attributes and
-        level
-
-        Args:
-            attribute_names_list (List[AF.Asset.AFAttribute]):  List of
-                Attributes to query.
-            level (int): level to query to
-
-        Returns:
-            pd.DataFrame: self
-        """
-        print("Fetching attribute(s)...")
-
-        for attribute in attribute_names_list:
-            self.df[attribute + " [" + str(level) + "]"] = self.df.loc[
-                self.df["Level"] == level, "Event"
-            ].apply(lambda x: x.get_attribute_values([attribute])[attribute])
-
-        for colname in self.df.columns:
-            try:
-                self.df[colname] = self.df[colname].astype(float)
-            except:
-                pass
-        return self.df
-
-    def condense(self) -> pd.DataFrame:
-        """Condense the AssetHierarchy object to return a condensed,
-        vertically layered representation of the Asset Tree
-
-        Returns:
-            pd.DataFrame: Condensed dataframe
-        """
-        print("Condensing...")
-
-        df = self.df.copy()
-        # merge level by level
-        for level in range(int(df["Level"].min()), int(df["Level"].max() + 1)):
-            # subdf per level
-            df_level = df[df["Level"] == level]
-            # remove empty columns
-            df_level.dropna(how="all", axis=1, inplace=True)
-            if df_level.empty:
-                df_condensed[level] = "TempValue"
-            else:
-                # add auxiliary columns for merge based on path
-                cols = [x for x in range(level + 1)]
-                df_level[cols] = (
-                    df_level["Path"].str.split("\\", expand=True).loc[:, 4:]
-                )
-                # remove Path columns
-                df_level.drop(["Path"], 1, inplace=True)
-                # rename columns, ignore columns with number names
-                df_level.columns = [
-                    col_name + " [" + str(int(level)) + "]"
-                    if not ((type(col_name) == int) or ("[" in col_name))
-                    else col_name
-                    for col_name in df_level.columns
-                ]
-                # merge with previous level
-                if level == int(df["Level"].min()):
-                    df_condensed = df_level
-                else:
-                    df_condensed = pd.merge(
-                        df_condensed,
-                        df_level,
-                        how="outer",
-                        left_on=cols[:-1],
-                        right_on=cols[:-1],
-                    )
-        # drop auxiliary columns
-        df_condensed.drop(
-            [
-                col_name
-                for col_name in df_condensed.columns
-                if type(col_name) == int
-            ],
-            1,
-            inplace=True,
-        )
-        # remove duplicates
-        df_condensed = df_condensed.drop_duplicates(keep="first")
-
-        return df_condensed

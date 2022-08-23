@@ -8,12 +8,12 @@ from PIconnect.config import PIConfig
 
 
 def to_af_time_range(
-    start_time: Union[str, datetime.datetime],
-    end_time: Union[str, datetime.datetime, float],
+    start_time: Union[str, datetime],
+    end_time: Union[str, datetime, float],
 ) -> AF.Time.AFTimeRange:
     """Convert a combination of start and end time to a time range.
 
-    Both `start_time` and `end_time` can be either a :any:`datetime.datetime`
+    Both `start_time` and `end_time` can be either a :any:`datetime`
     object or a string `datetime` objects are first converted to a string,
     before being passed to :afsdk:`AF.Time.AFTimeRange
     <M_OSIsoft_AF_Time_AFTimeRange__ctor_1.htm>`. It is also possible to
@@ -21,8 +21,8 @@ def to_af_time_range(
     boundary as a relative string.
 
     Args:
-        start_time (Union[str, datetime.datetime]): start time
-        end_time (Union[str, datetime.datetime, float]): end time if str or
+        start_time (Union[str, datetime]): start time
+        end_time (Union[str, datetime, float]): end time if str or
             datetime object. Else if float will use current time.
 
     Returns:
@@ -44,11 +44,11 @@ def to_af_time_range(
     return AF.Time.AFTimeRange(start_time, end_time)
 
 
-def to_af_time(time: Union[str, datetime.datetime]) -> AF.Time.AFTime:
+def to_af_time(time: Union[str, datetime]) -> AF.Time.AFTime:
     """Convert a time to a AFTime value.
 
     Args:
-        time (Union[str,datetime.datetime]): Time to convert to AFTime.
+        time (Union[str,datetime]): Time to convert to AFTime.
 
     Returns:
         :afsdk:`AF.Time.AFTime <M_OSIsoft_AF_Time_AFTime__ctor_7.htm>`: Time

@@ -762,7 +762,7 @@ class TagList(UserList):
         starttime: Union[str, datetime.datetime],
         endtime: Union[str, datetime.datetime],
         nr_of_intervals: int,
-    ) -> Dict[pd.DataFrame]:
+    ) -> Dict[str, pd.DataFrame]:
         """Retrieves values over the specified time range suitable for plotting
         over the number of intervals (typically represents pixels).Returns a
         Dictionary of DataFrames for Tags in Taglist with values that will
@@ -775,9 +775,7 @@ class TagList(UserList):
             nr_of_intervals (int): Number of intervals
 
         Returns:
-            Dict[pd.DataFrame]: Dictionary of Dataframes with values that
-            will produce the most accurate plot over the time range while
-            minimizing the amount of data returned
+            Dict[str, pd.DataFrame]: TagName: Dataframe of Data
         """
         AFTimeRange = to_af_time_range(starttime, endtime)
         PIPointlist = generate_pipointlist(self)
@@ -869,7 +867,7 @@ class TagList(UserList):
         endtime: Union[str, datetime.datetime],
         filter_expression: str = "",
         AFBoundaryType: BoundaryType = BoundaryType.INTERPOLATED,
-    ) -> Dict[pd.DataFrame]:
+    ) -> Dict[str, pd.DataFrame]:
         """Retrieve recorded values for each Tag in TagList
 
         Args:
@@ -881,8 +879,7 @@ class TagList(UserList):
                 Defaults to BoundaryType.INTERPOLATED.
 
         Returns:
-            Dict[pd.DataFrame]: dictionary of Dataframes of recorded values
-                for Tags in TagList
+            Dict[str, pd.DataFrame]: tag Name: dataframe of data
         """
         PIPointlist = generate_pipointlist(self)
         AFTimeRange = to_af_time_range(starttime, endtime)
