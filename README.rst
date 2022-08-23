@@ -23,8 +23,8 @@ Tutorial
 
     import PIconnect
 
-    # set up timezone
-    # Pick timezone from https://gist.github.com/heyalexej/8bf688fd67d7199be4a1682b3eec7568
+    # set up timezone. Pick timezone from 
+    # https://gist.github.com/heyalexej/8bf688fd67d7199be4a1682b3eec7568
     PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
 
     # List of available PI data servers
@@ -47,7 +47,8 @@ Tutorial
     )
     print(afdatabases)
 
-    # Initiate connection to PI data server & PI AF database of interest by defining their name
+    # Initiate connection to PI data server & PI AF database of interest by
+    # defining their name
     with PIconnect.PIAFDatabase(
         server=afservers[0], database=afdatabases[0]
     ) as afdatabase, PIconnect.PIServer(server=dataservers[0]) as server:
@@ -58,8 +59,8 @@ Tutorial
         # print server and database name for specified AF database
         print(f"{afdatabase.server_name}\\{afdatabase.database_name}")
 
+        # ...<All other code blocks are inserted here>...
 
-        #...<All other code blocks are inserted here>...
 
 2. Asset
 *******************************************************
