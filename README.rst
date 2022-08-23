@@ -114,13 +114,13 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
     
     # Make afhierarchy visible in variable explorer
     # (string & float representation)
-    viewable = PIconnect.PI.view(afhierarchy)
+    viewable = PIconnect.PI.view(afhierarchy.df)
     
     # For accessing AssetHierarchy methods, use accessor("ahy") -----
     
     # Condense the AssetHierarchy object to return a condensed, vertically layered
     # representation of the Asset Tree
-    afhierarchy_condensed = afhierarchy.ahy.condense()
+    afhierarchy_condensed = afhierarchy.condense()
     
     # Make condensed afhierarchy visible in variable explorer
     # (string & float representation)
@@ -142,9 +142,12 @@ An event frame encapsulates the time period of the event and links it to assets 
     )
     
     # Here a query is executed over the whole Event Hierarchy for an Event that
-    # has template name 'Phase'
+    # has template name 'Phase'.
+    # Using datetime to avoid US vs. EU date confusion
+    start_date = datetime(day=1, month=3, year=2022)
+    end_date = datetime(day=31, month=3, year=2022)
     eventlist = afdatabase.find_events(
-        template_name="Phase", start_time="01/03/2022", end_time="31/03/2022"
+        template_name="Phase", start_time=start_date, end_time=end_date
     )
 
     
