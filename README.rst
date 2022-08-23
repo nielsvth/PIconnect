@@ -22,33 +22,42 @@ Tutorial
 .. code-block:: python
 
     import PIconnect
-    
-    #set up timezone
-    #Pick timezone from https://gist.github.com/heyalexej/8bf688fd67d7199be4a1682b3eec7568
-    PIconnect.PIConfig.DEFAULT_TIMEZONE = 'Europe/Brussels'
 
-    #List of available PI data servers
-    #PI Servers are used for accessing Tag (pipoint) data
+    # set up timezone
+    # Pick timezone from https://gist.github.com/heyalexej/8bf688fd67d7199be4a1682b3eec7568
+    PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
+
+    # List of available PI data servers
+    # PI Servers are used for accessing Tag (pipoint) data
     dataservers = list(PIconnect.PIServer.servers.keys())
     print(dataservers)
 
-    #List of available PI AF servers
+    # List of available PI AF servers with databases
     # AF servers are used for accessing Event and Asset objects
-    afservers = list(PIconnect.PIAFDatabase.servers.keys())
+    afservers = [
+        servName
+        for servName in PIconnect.PIAFDatabase.servers.keys()
+        if len(PIconnect.PIAFDatabase.servers[servName]["databases"].keys()) > 0
+    ]
     print(afservers)
 
-    #List of available PI AF databases for first AF server in afservers list
-    afdatabases = list(PIconnect.PIAFDatabase.servers[afservers[0]]['databases'].keys())
+    # List of available PI AF databases for first AF server in afservers list
+    afdatabases = list(
+        PIconnect.PIAFDatabase.servers[afservers[0]]["databases"].keys()
+    )
     print(afdatabases)
 
-    #Initiate connection to PI data server & PI AF database of interest by defining their name
-    with PIconnect.PIAFDatabase(server=afservers[0], database=afdatabases[0]) as afdatabase, PIconnect.PIServer(server=dataservers[0]) as server:
+    # Initiate connection to PI data server & PI AF database of interest by defining their name
+    with PIconnect.PIAFDatabase(
+        server=afservers[0], database=afdatabases[0]
+    ) as afdatabase, PIconnect.PIServer(server=dataservers[0]) as server:
 
-        #print name of specified server
+        # print name of specified server
         print(server.server_name)
 
-        #print server and database name for specified AF database
-        print(f'{afdatabase.server_name}\\{afdatabase.database_name}')
+        # print server and database name for specified AF database
+        print(f"{afdatabase.server_name}\\{afdatabase.database_name}")
+
 
         #...<All other code blocks are inserted here>...
 
@@ -60,26 +69,31 @@ The following tutorial elaborates on the Asset class and some of its key attribu
 
 .. code-block:: python
 
-    #Returns list of Assets that meets the query criteria
-    #Here a query is executed for an Asset with name '091_R022'
-    #For more info on how to construct queries, see further
-    assetlist = afdatabase.find_assets(query='091_R022')
-    
-    #Use '*' as a joker sign
-    assetlist = afdatabase.find_assets(query='*R022')
-    
-    #Select the Asset from the Asset list 
+    # Returns list of Assets that meets the query criteria
+    # Here a query is executed for an Asset with name '091_R022'
+    # For more info on how to construct queries, see further
+    assetlist = afdatabase.find_assets(query="091_R022")
+
+    # Use '*' as a joker sign
+    assetlist = afdatabase.find_assets(query="*R022")
+
+    # Select the Asset from the Asset list
     asset = assetlist[0]
-    
-    #Some Asset class attributes
+
+    # Some Asset class attributes
     print(asset.name)
     print(asset.parent.name)
-    
-    #Get EventList of Events on this Asset that meet the query criteria
-    #Here a query is executed for Events with template name 'Phase' within the defined timeframe
-    events = asset.get_events(start_time='*-50d', end_time='*')
-    events = asset.get_events(start_time='*-50d', end_time='*', template_name='Phase')
-    events = asset.get_events(start_time='01/03/2022', end_time='31/03/2022', template_name='Phase')
+
+    # Get EventList of Events on this Asset that meet the query criteria
+    # Here a query is executed for Events with template name 'Phase' within the defined timeframe
+    events = asset.get_events(start_time="*-50d", end_time="*")
+    events = asset.get_events(
+        start_time="*-50d", end_time="*", template_name="Phase"
+    )
+    events = asset.get_events(
+        start_time="01/03/2022", end_time="31/03/2022", template_name="Phase"
+    )
+
 
 3. AssetHierarchy
 *******************************************************
