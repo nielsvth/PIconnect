@@ -48,6 +48,7 @@ from warnings import warn
 
 from PIconnect._utils import classproperty
 from PIconnect.AFSDK import AF
+from PIconnect.time import to_af_time
 from PIconnect.PIConsts import (
     EventFrameSearchMode,
     SearchMode,
@@ -331,6 +332,9 @@ class Asset:
             EventList: Results of events
         """
         asset = self.name
+        # to handle datetime
+        start_time = to_af_time(start_time)
+        end_time = to_af_time(end_time)
         return self.database.find_events(
             query,
             asset,
@@ -660,6 +664,9 @@ class PIAFDatabase(object):
 
         if not start_time:
             start_time = AF.Time.AFTime.Now
+
+        start_time = to_af_time(start_time)
+        end_time = to_af_time(end_time)
 
         lst = AF.EventFrame.AFEventFrame.FindEventFrames(
             self.database,
