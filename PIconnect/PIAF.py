@@ -112,6 +112,19 @@ class EventList(UserList):
             except:
                 raise ("Failed to process event {}".format(event))
 
+        df_events = EventHierarchy(
+            pd.DataFrame(
+                columns=[
+                    "Event",
+                    "Path",
+                    "Name",
+                    "Level",
+                    "Template",
+                    "Starttime",
+                    "Endtime",
+                ]
+            )
+        )
         if len(afcontainer) > 0:
             df_procedures = pd.DataFrame(
                 [(y, y.GetPath()) for y in afcontainer],
@@ -167,20 +180,9 @@ class EventList(UserList):
                 )
             )  # not completely correct if different templates on a single
             # level
-            return df_events
+            df_events = EventHierarchy(df_events)
 
-        else:
-            return pd.DataFrame(
-                columns=[
-                    "Event",
-                    "Path",
-                    "Name",
-                    "Level",
-                    "Template",
-                    "Starttime",
-                    "Endtime",
-                ]
-            )
+        return df_events
 
 
 class Asset:
@@ -1297,6 +1299,7 @@ class Event:
                 "\\".join([str(ev) for ev in df_events["Template"].unique()])
             )
         )  # not really correct when different templates on a level
+        df_events = EventHierarchy(df_events)
         return df_events
 
 
