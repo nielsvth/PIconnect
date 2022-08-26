@@ -186,9 +186,11 @@ class EventList(UserList):
 
 
 class Asset:
-    """Container for Event object"""
+    """Container for Asset object
 
-    # TODO: isn't it for the Asset object?
+    additional methods can be found here:
+    https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFElement.htm # noqa
+    """
 
     def __init__(self, asset):
         self.asset = asset
@@ -255,14 +257,21 @@ class Asset:
         """'Return list of AFAttributes for Asset"""
         return [attribute for attribute in self.asset.Attributes]
 
+    @property
     def children(self):
         """Return List of children for Asset"""
-        return list([Asset(asset) for asset in self.asset.children])
+        out = None
+        if self.asset.HasChildren:
+            out = [Asset(asset) for asset in self.asset.Elements]
+        return out
 
     @property
     def parent(self):
         """Return parent Asset for Asset"""
-        return Asset(self.asset.Parent)
+        out = self.asset.Parent
+        if out is not None:
+            out = Asset(out)
+        return out
 
     @property
     def description(self):
@@ -1713,7 +1722,7 @@ class CondensedEventHierarchy:
                 + "format"
             )
         for event in df.columns[
-            df.columns.str.contains("Event\s\[.*]", regex=True)
+            df.columns.str.contains(r"Event\s\[.*]", regex=True)
         ]:
             if not list(df[event].apply(lambda x: type(x)).unique()) == [
                 Event
