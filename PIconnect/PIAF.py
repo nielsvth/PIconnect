@@ -294,12 +294,12 @@ class Asset:
             Dict[str, float]: attribute Name: attribute value
         """
         if attribute_names_list is None:
-            attribute_names_list = self.eventframe.Attributes
+            attribute_names_list = self.asset.Attributes
 
         attribute_dct = {
             attribute.Name: attribute.GetValue().Value
             for attribute in attribute_names_list
-            if attribute.Name in self.eventframe.Attributes
+            if attribute.Name in self.asset.Attributes
         }
 
         return attribute_dct
