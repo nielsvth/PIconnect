@@ -294,12 +294,15 @@ class Asset:
             Dict[str, float]: attribute Name: attribute value
         """
         if attribute_names_list is None:
-            attribute_names_list = self.asset.Attributes
+            attribute_names_list = [
+                asset.Name for asset in self.asset.Attributes
+            ]
 
         attribute_dct = {
             attribute.Name: attribute.GetValue().Value
-            for attribute in attribute_names_list
-            if attribute.Name in self.asset.Attributes
+            for attribute in self.asset.Attributes
+            if (attribute.Name in attribute_names_list)
+            or (attribute in attribute_names_list)
         }
 
         return attribute_dct
@@ -1224,7 +1227,9 @@ class Event:
 
     def get_attribute_values(
         self,
-        attribute_names_list: Union[None, List[AF.Asset.AFAttribute]] = None,
+        attribute_names_list: Union[
+            None, List[str], List[AF.Asset.AFAttribute]
+        ] = None,
     ) -> Dict[str, float]:
         """Get attribute values for specified attributes
 
@@ -1237,12 +1242,15 @@ class Event:
             Dict[str, float]: attribute Name: attribute value
         """
         if attribute_names_list is None:
-            attribute_names_list = self.eventframe.Attributes
+            attribute_names_list = [
+                att.Name for att in self.eventframe.Attributes
+            ]
 
         attribute_dct = {
             attribute.Name: attribute.GetValue().Value
-            for attribute in attribute_names_list
-            if attribute.Name in self.eventframe.Attributes
+            for attribute in self.eventframe.Attributes
+            if (attribute.Name in attribute_names_list)
+            or (attribute in attribute_names_list)
         }
 
         return attribute_dct
