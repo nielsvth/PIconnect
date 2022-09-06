@@ -100,7 +100,7 @@ class EventList(UserList):
         """Return eventlist as set"""
         return set(self.data)
 
-    def get_event_hierarchy(self, depth=10):
+    def get_event_hierarchy(self, depth=10) -> pd.DataFrame:
         """Return EventHierarchy down to the specified depth"""
         # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_AFNamedCollectionList_1.htm
         afcontainer = AF.AFNamedCollectionList[
@@ -112,19 +112,18 @@ class EventList(UserList):
             except:
                 raise ("Failed to process event {}".format(event))
 
-        df_events = EventHierarchy(
-            pd.DataFrame(
-                columns=[
-                    "Event",
-                    "Path",
-                    "Name",
-                    "Level",
-                    "Template",
-                    "Starttime",
-                    "Endtime",
-                ]
-            )
+        df_events = pd.DataFrame(
+            columns=[
+                "Event",
+                "Path",
+                "Name",
+                "Level",
+                "Template",
+                "Starttime",
+                "Endtime",
+            ]
         )
+
         if len(afcontainer) > 0:
             df_procedures = pd.DataFrame(
                 [(y, y.GetPath()) for y in afcontainer],
@@ -146,8 +145,6 @@ class EventList(UserList):
                     [(y, y.GetPath()) for y in event_depth],
                     columns=["Event", "Path"],
                 )
-            else:
-                df_events = pd.DataFrame()
 
             # concatenate procedures and child event frames
             df_events = pd.concat(
@@ -180,7 +177,6 @@ class EventList(UserList):
                 )
             )  # not completely correct if different templates on a single
             # level
-            df_events = EventHierarchy(df_events)
 
         return df_events
 
@@ -1282,13 +1278,12 @@ class Event:
             afcontainer, False, depth, 1000000
         )
 
+        df_events = pd.DataFrame()
         if len(event_depth) > 0:
             df_events = pd.DataFrame(
                 [(y, y.GetPath()) for y in event_depth],
                 columns=["Event", "Path"],
             )
-        else:
-            df_events = pd.DataFrame()
 
         # concatenate procedures and child event frames
         df_events = pd.concat([df_procedures, df_events], ignore_index=True)
@@ -1316,7 +1311,7 @@ class Event:
                 "\\".join([str(ev) for ev in df_events["Template"].unique()])
             )
         )  # not really correct when different templates on a level
-        df_events = EventHierarchy(df_events)
+
         return df_events
 
 

@@ -259,24 +259,24 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
     # Add attribute values to EventHierarchy for specified attributes, defined for
     # the specified template. Here values are added for the attribute 'B_PH_INFO',
     # defined for the Phase template
-    eventhierarchy = eventhierarchy.add_attributes(
+    eventhierarchy = eventhierarchy.ehy.add_attributes(
         attribute_names_list=["B_PH_INFO"], template_name="Phase"
     )
 
     # Add referenced elements to EventHierarchy for specified event template/level
     # Here referenced elements are added that are defined for the the
     # UnitProcedure template
-    eventhierarchy = eventhierarchy.add_ref_elements(
+    eventhierarchy = eventhierarchy.ehy.add_ref_elements(
         template_name="UnitProcedure"
     )
 
     # Make EventHierarchy dataframe visible in variable explorer
     # (string & float representation)
-    viewable = PIconnect.PI.view(eventhierarchy.df)
+    viewable = PIconnect.PI.view(eventhierarchy)
 
     # Return dataframe of interpolated data for discrete events of EventHierarchy
     # Set 'col' argument to 'False' to specify a list of tags
-    interpolated_values = eventhierarchy.interpol_discrete_extract(
+    interpolated_values = eventhierarchy.ehy.interpol_discrete_extract(
         tag_list=["100_091_R019_TT04A", "100_091_R019_ST01"],
         interval="1h",
         dataserver=server,
@@ -285,12 +285,12 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
 
     # Set 'col' argument to 'True' to have the ability to specify a column that
     # contains tag per event
-    interpolated_values = eventhierarchy.interpol_discrete_extract(
+    interpolated_values = eventhierarchy.ehy.interpol_discrete_extract(
         tag_list=["column_name"], interval="1h", dataserver=server, col=True
     )
 
     # Return dataframe of summary data for discrete events of EventHierarchy
-    summary_values = eventhierarchy.summary_extract(
+    summary_values = eventhierarchy.ehy.summary_extract(
         tag_list=["100_091_R019_TT04A", "100_091_R019_ST01"],
         summary_types=4 | 8 | 32,
         dataserver=server,
