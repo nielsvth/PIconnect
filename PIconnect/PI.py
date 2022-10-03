@@ -993,7 +993,7 @@ class TagList(UserList):
                 df = pd.DataFrame(values, columns=["Value", "Timestamp"])
                 df["Tag"] = point
                 df["Summary"] = summaries
-                df_final = df_final.append(df, ignore_index=True)
+                df_final = pd.concat([df_final, df], ignore_index=True)
 
             return df_final[["Tag", "Summary", "Value", "Timestamp"]]
         else:

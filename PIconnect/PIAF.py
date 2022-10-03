@@ -1428,7 +1428,7 @@ class EventHierarchy:
                     df_level["Path"].str.split("\\", expand=True).loc[:, 4:]
                 )
                 # remove Path columns
-                df_level.drop(["Path"], 1, inplace=True)
+                df_level.drop(columns=["Path"],inplace=True)
                 # rename columns, ignore columns with number names
                 df_level.columns = [
                     col_name + " [" + str(int(level)) + "]"
@@ -1449,12 +1449,11 @@ class EventHierarchy:
                     )
         # drop auxiliary columns
         df_condensed.drop(
-            [
+            columns=[
                 col_name
                 for col_name in df_condensed.columns
                 if type(col_name) == int
             ],
-            1,
             inplace=True,
         )
         # remove duplicates
@@ -1787,7 +1786,7 @@ class CondensedEventHierarchy:
                 )
 
             # add procedure names
-            df["Procedure"] = df["Event"].apply(lambda x: x.procedure)
+            df["Procedure"] = df["Event"].apply(lambda x: x.top_event)
             df = df[["Procedure", "Event"]]
             df.reset_index(drop=True, inplace=True)
 
@@ -1830,7 +1829,7 @@ class CondensedEventHierarchy:
                 )
 
             # add procedure names
-            df["Procedure"] = df["Event"].apply(lambda x: x.procedure)
+            df["Procedure"] = df["Event"].apply(lambda x: x.top_event)
             df = df[["Procedure", "Event", "Tags"]]
             df.reset_index(drop=True, inplace=True)
 
@@ -1897,7 +1896,7 @@ class CondensedEventHierarchy:
         df_base = self.df[[col_event]].copy()
         df_base.columns = ["Event"]
         # add procedure names
-        df_base["Procedure"] = df_base["Event"].apply(lambda x: x.procedure)
+        df_base["Procedure"] = df_base["Event"].apply(lambda x: x.top_event)
         df_base = df_base[["Procedure", "Event"]]
         df_base.reset_index(drop=True, inplace=True)
 
@@ -1984,7 +1983,7 @@ class CondensedEventHierarchy:
         df_base = self.df[[col_event]].copy()
         df_base.columns = ["Event"]
         # add procedure names
-        df_base["Procedure"] = df_base["Event"].apply(lambda x: x.procedure)
+        df_base["Procedure"] = df_base["Event"].apply(lambda x: x.top_event)
         df_base = df_base[["Procedure", "Event"]]
         df_base.reset_index(drop=True, inplace=True)
 
@@ -2058,7 +2057,7 @@ class CondensedEventHierarchy:
         df_base = self.df[[col_event]].copy()
         df_base.columns = ["Event"]
         # add procedure names
-        df_base["Procedure"] = df_base["Event"].apply(lambda x: x.procedure)
+        df_base["Procedure"] = df_base["Event"].apply(lambda x: x.top_event)
         df_base = df_base[["Procedure", "Event"]]
         df_base.reset_index(drop=True, inplace=True)
 
@@ -2171,7 +2170,7 @@ class CondensedEventHierarchy:
                 )
 
             # add procedure names
-            df["Procedure"] = df["Event"].apply(lambda x: x.procedure)
+            df["Procedure"] = df["Event"].apply(lambda x: x.top_event)
             df = df[["Procedure", "Event"]]
             df.reset_index(drop=True, inplace=True)
 
@@ -2214,7 +2213,7 @@ class CondensedEventHierarchy:
                 )
 
             # add procedure names
-            df["Procedure"] = df["Event"].apply(lambda x: x.procedure)
+            df["Procedure"] = df["Event"].apply(lambda x: x.top_event)
             df = df[["Procedure", "Event", "Tags"]]
             df.reset_index(drop=True, inplace=True)
 
