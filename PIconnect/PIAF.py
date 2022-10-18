@@ -32,6 +32,7 @@ from builtins import (
     zip,
 )
 from typing import Dict, List, Union
+from xml.sax.handler import property_dom_node
 
 import clr
 import pandas as pd
@@ -181,6 +182,97 @@ class EventList(UserList):
         return df_events
 
 
+class Attribute:
+    """container for Attribute object"""
+
+    def __init__(self, attribute):
+        self.attribute = attribute
+
+    def __repr__(self):
+        return f"Attribute: {self.attribute.Name} [source: {self.attribute.DataReferencePlugIn.Name}]"
+
+    def __str__(self):
+        return f"Attribute: {self.attribute.Name} [source: {self.attribute.DataReferencePlugIn.Name}]"
+
+    # properties
+    @property
+    def name(self):
+        """Return name of Attribute"""
+        return self.attribute.Name
+
+    @property
+    def path(self):
+        """Return Path"""
+        return self.attribute.GetPath()
+
+    @property
+    def af_attribute(self):
+        """Return AFAttribute Object"""
+        return self.attribute
+
+    @property
+    def source_type(self):
+        """Return name of Attribute's data reference"""
+        return self.attribute.DataReference.Name
+
+    @property
+    def pipoint(self):
+        """Return PIPoint object, if exists"""
+        return Tag(self.attribute.PIPoint)
+
+    @property
+    def pisystem_name(self):
+        """Return PISystem name"""
+        return self.attribute.PISystem.Name
+
+    @property
+    def database_name(self):
+        """Return Database name"""
+        return self.attribute.Database.Name
+
+    @property
+    def database(self):
+        """Return PIAFDatabase object"""
+        return PIAFDatabase(
+            server=self.pisystem_name, database=self.database_name
+        )
+
+    @property
+    def description(self):
+        """Return description for Attribute"""
+        return self.attribute.Description
+
+    @property
+    def uom(self):
+        """Return displayed Unit of Measurement (uom) for Attribute"""
+        return self.attribute.DisplayUOM
+
+    @property
+    def parent(self):
+        """Returns the Element that owns this Attributes (Asset or Event)"""
+        # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_AFIdentity.htm
+        id = self.attribute.Element.Identity
+        if id == 45:
+            return Asset(self.attribute.Element)
+        elif id == 87:
+            return Event(self.attribute.Element)
+
+    @property
+    def template(self):
+        """Return template name for Attribute"""
+        return self.attribute.Template.Name
+
+    @property
+    def type(self):
+        """Return datatype of Attribute"""
+        return self.attribute.Type.Name
+
+    # Methods
+    def current_value(self):
+        """Return current value for Attribute"""
+        return self.attribute.GetValue().Value
+
+
 class Asset:
     """Container for Asset object
 
@@ -227,7 +319,7 @@ class Asset:
 
     @property
     def af_asset(self):
-        """Return AFEventFrame object"""
+        """Return AFAsset object"""
         return self.asset
 
     @property
@@ -246,7 +338,7 @@ class Asset:
     @property
     def attributes(self):
         """'Return list of attribute names for Asset"""
-        return [attribute.Name for attribute in self.asset.Attributes]
+        return [Attribute(attribute) for attribute in self.asset.Attributes]
 
     @property
     def af_attributes(self):
@@ -889,7 +981,9 @@ class Event:
     @property
     def attributes(self):
         """'Return list of attribute names"""
-        return [attribute.Name for attribute in self.eventframe.Attributes]
+        return [
+            Attribute(attribute) for attribute in self.eventframe.Attributes
+        ]
 
     @property
     def af_attributes(self):
@@ -1428,7 +1522,7 @@ class EventHierarchy:
                     df_level["Path"].str.split("\\", expand=True).loc[:, 4:]
                 )
                 # remove Path columns
-                df_level.drop(columns=["Path"],inplace=True)
+                df_level.drop(columns=["Path"], inplace=True)
                 # rename columns, ignore columns with number names
                 df_level.columns = [
                     col_name + " [" + str(int(level)) + "]"
