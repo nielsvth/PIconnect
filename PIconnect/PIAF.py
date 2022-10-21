@@ -1461,7 +1461,7 @@ class EventHierarchy:
         for attribute in attribute_names_list:
             self.df[attribute + " [" + str(template_name) + "]"] = self.df.loc[
                 self.df["Template"] == template_name, "Event"
-            ].apply(lambda x: x.get_attribute_values([attribute])[attribute])
+            ].apply(lambda x: lambda_aux_add_attributes(x, attribute))
 
         for colname in self.df.columns:
             try:
@@ -2340,3 +2340,11 @@ class CondensedEventHierarchy:
         df.reset_index(drop=True, inplace=True)
 
         return df
+
+#aux functions
+
+def lambda_aux_add_attributes(x, attribute):
+    try: 
+        return x.get_attribute_values([attribute])[attribute]
+    except:
+        return np.nan

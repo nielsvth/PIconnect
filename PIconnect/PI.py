@@ -32,6 +32,7 @@ from builtins import (
     super,
     zip,
 )
+from dataclasses import dataclass
 import datetime
 from typing import Dict, List, Union
 
@@ -52,7 +53,7 @@ from PIconnect.PIConsts import (
     PIPointType,
     ExpressionSampleType,
 )
-from PIconnect.time import timestamp_to_index, to_af_time_range, add_timezone
+from PIconnect.time import timestamp_to_index, to_af_time_range, add_timezone, to_af_time
 
 from collections import UserList
 
@@ -181,11 +182,11 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
         self.connection.Disconnect()
 
     def __repr__(self):
-        return "%s(\\\\%s)" % (self.__class__.__name__, self.server_name)
+        return "%s(\\\\%s)" % (self.__class__.__name__, self.name)
 
     @property
-    def server_name(self):
-        """server_name
+    def name(self):
+        """name
 
         Name of the connected server
         """
@@ -343,9 +344,17 @@ class Tag:
         return str(PIPointType(self.pointtype))
 
     # Methods
-    def current_value(self):
+    def current_value(self) -> int:
         """Return last recorded value"""
         return self.tag.CurrentValue().Value
+
+    def interpolated_value(
+        self,
+        time: Union[str, datetime.datetime]
+    ) -> int:
+        """Return interpolated value as specified time"""
+        aftime = to_af_time(time)
+        return self.tag.InterpolatedValue(aftime)
 
     def interpolated_values(
         self,
@@ -502,9 +511,38 @@ class Tag:
                 [[summary, value, timestamp]],
                 columns=["Summary", "Value", "Timestamp"],
             )
-            df_final = df_final.append(df, ignore_index=True)
+            df_final = pd.concat([df_final, df], ignore_index=True)
 
         return df_final
+
+    def _parseSummariesResult(self, result: SummaryType) -> pd.DataFrame:
+        """Parse a Summaries result and return a dataframe.
+
+        Args:
+            res (SummaryType): Summary to parse
+
+        Returns:
+            pd.DataFrame: resulting dataframe
+        """
+        # summaries
+        df_final = pd.DataFrame()
+        for x in result:  # per summary
+            summary = SummaryType(x.Key).name
+            values = [
+                (timestamp_to_index(value.Timestamp.UtcTime), value.Value)
+                for value in x.Value
+            ]
+            df = pd.DataFrame(values, columns=["Timestamp", "Value"])
+            df["Summary"] = summary
+            df_final = pd.concat([df_final, df], ignore_index=True)
+
+        return df_final[
+            [
+                "Summary",
+                "Value",
+                "Timestamp",
+            ]
+        ]
 
     # CalculationBasis.EVENT_WEIGHTED avoids issues(?) with interpolation:
     # ref. #Issue 1
@@ -631,7 +669,7 @@ class Tag:
             time_type,
         )
 
-        df_final = self._parseSummaryResult(result)
+        df_final = self._parseSummariesResult(result)
 
         return df_final
 
@@ -712,7 +750,7 @@ class Tag:
             time_type,
         )
 
-        df_final = self._parseSummaryResult(result)
+        df_final = self._parseSummariesResult(result)
 
         return df_final
 
