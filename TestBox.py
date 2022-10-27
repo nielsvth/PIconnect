@@ -109,3 +109,35 @@ with PIconnect.PIAFDatabase(
 
     x = tag.interpolated_value("2022-10-20 18:54:38")
     print(x)
+
+
+    def calc_recorded(
+        starttime: Union[str, datetime.datetime] = None,
+        endtime: Union[str, datetime.datetime] = "*",
+        expression: str = "",
+    ) -> pd.DataFrame:
+
+        afrange = to_af_time_range(starttime, endtime)
+        result = AF.Data.AFCalculation.CalculateAtRecordedValues(
+            0, expression, afrange
+        )
+
+        if result:
+            # process query results
+            data = [list(result)]
+            df = pd.DataFrame(data).T
+            df.columns = ['calculation']
+            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm # noqa
+            df.index = df[df.columns[0]].apply(
+                lambda x: timestamp_to_index(x.Timestamp.UtcTime)
+            )
+            df.index.name = "Index"
+            df = df.applymap(lambda x: x.Value)
+        else:  # if no result, return empty dataframe
+            df = pd.DataFrame()
+
+        return df
+
+
+    x = calc_recorded("1-10-2022 14:00","1-10-2022 22:00", r"IF ('\\ITSBEBEPIHISCOL\SINUSOID' > 70) THEN (Abs('\\ITSBEBEPIHISCOL\SINUSOID')) ELSE (0)",)
+    print([y.Value for y in x])

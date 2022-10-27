@@ -281,7 +281,7 @@ class Tag:
     def validate(tag):
         if not isinstance(tag, AF.PI.PIPoint):
             raise AttributeError(
-                "Can not convert this type of input to Tag object"
+                "This type of input is not a Tag object, use the 'find_tags' function of the PIServer class to find tag objects"
             )
 
     def __load_attributes(self):
@@ -1272,6 +1272,8 @@ def generate_pipointlist(tag_list: TagList) -> AF.PI.PIPointList:
 
 # TODO: This should be converted to a staticmethod for the TagList class.
 # TODO: Confirm the type for dataserver.
+
+
 def convert_to_TagList(
     tag_list: List[Union[str, Tag]], dataserver: PIServer = None
 ) -> TagList:
@@ -1298,13 +1300,7 @@ def convert_to_TagList(
         try:
             return TagList(tag_list)
         except:
-            if dataserver:
-                return dataserver.find_tags(tag_list)
-            else:
-                raise AttributeError(
-                    "Specifiy a dataserver when using tags in string format"
-                )
-
+            return dataserver.find_tags(tag_list)
 
 # Can't the user can simply use iPyKernel's display func, e.g. display(df)
 def view(dataframe: pd.DataFrame) -> pd.DataFrame:
