@@ -32,11 +32,11 @@ from builtins import (
     zip,
 )
 from typing import Dict, List, Union
-from xml.sax.handler import property_dom_node
 
 import clr
 import pandas as pd
 import numpy as np
+import System
 
 from collections import UserList
 
@@ -218,7 +218,10 @@ class Attribute:
     @property
     def pipoint(self):
         """Return PIPoint object, if exists"""
-        return Tag(self.attribute.PIPoint)
+        try:
+            return Tag(self.attribute.PIPoint)
+        except:
+            return None
 
     @property
     def pisystem_name(self):
@@ -270,7 +273,10 @@ class Attribute:
     # Methods
     def current_value(self):
         """Return current value for Attribute"""
-        return self.attribute.GetValue().Value
+        result = self.attribute.GetValue().Value
+        if type(result) == System.DateTime:
+            result = timestamp_to_index(result)
+        return result
 
 
 class Asset:
@@ -398,8 +404,8 @@ class Asset:
     def get_events(
         self,
         query: str = None,
-        start_time: Union[str, datetime] = None,
-        end_time: Union[str, datetime] = "*",
+        starttime: Union[str, datetime] = None,
+        endtime: Union[str, datetime] = "*",
         template_name: str = None,
         start_index: int = 0,
         max_count: int = 1000000,
@@ -435,13 +441,13 @@ class Asset:
         """
         asset = self.name
         # to handle datetime
-        start_time = to_af_time(start_time)
-        end_time = to_af_time(end_time)
+        starttime = to_af_time(starttime)
+        endtime = to_af_time(endtime)
         return self.database.find_events(
             query,
             asset,
-            start_time,
-            end_time,
+            starttime,
+            endtime,
             template_name,
             start_index,
             max_count,
@@ -710,8 +716,8 @@ class PIAFDatabase(object):
         self,
         query: str = None,
         asset: str = "*",
-        start_time: Union[str, datetime] = None,
-        end_time: Union[str, datetime] = "*",
+        starttime: Union[str, datetime] = None,
+        endtime: Union[str, datetime] = "*",
         template_name: str = None,
         start_index: int = 0,
         max_count: int = 1000000,
@@ -764,18 +770,18 @@ class PIAFDatabase(object):
         else:
             template = None
 
-        if not start_time:
-            start_time = AF.Time.AFTime.Now
+        if not starttime:
+            starttime = AF.Time.AFTime.Now
 
-        start_time = to_af_time(start_time)
-        end_time = to_af_time(end_time)
+        starttime = to_af_time(starttime)
+        endtime = to_af_time(endtime)
 
         lst = AF.EventFrame.AFEventFrame.FindEventFrames(
             self.database,
             None,
             search_mode,
-            start_time,
-            end_time,
+            starttime,
+            endtime,
             query,
             asset,
             None,
@@ -2341,10 +2347,12 @@ class CondensedEventHierarchy:
 
         return df
 
-#aux functions
+
+# aux functions
+
 
 def lambda_aux_add_attributes(x, attribute):
-    try: 
+    try:
         return x.get_attribute_values([attribute])[attribute]
     except:
         return np.nan

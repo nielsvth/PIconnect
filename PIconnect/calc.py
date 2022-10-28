@@ -12,12 +12,14 @@ from PIconnect.time import (
 import pandas as pd
 
 def calc_recorded(
-    starttime: Union[str, datetime.datetime] = None,
-    endtime: Union[str, datetime.datetime] = "*",
-    expression: str = "",
+    starttime: Union[str, datetime.datetime],
+    endtime: Union[str, datetime.datetime],
+    expression: str,
 ) -> pd.DataFrame:
     """Returns dataframe that contains the result of evaluating the passed expression at each point in time
-    over the passed time range where a recorded value exists for a member of the expression."""
+    over the passed time range where a recorded value exists for a member of the expression.
+    
+    Expression arguments need to be entered as raw strings: r'expresion' """
     afrange = to_af_time_range(starttime, endtime)
     result = AF.Data.AFCalculation.CalculateAtRecordedValues(
         0, expression, afrange
@@ -40,17 +42,19 @@ def calc_recorded(
     return df
 
 def calc_interpolated(
-    starttime: Union[str, datetime.datetime] = None,
-    endtime: Union[str, datetime.datetime] = "*",
+    starttime: Union[str, datetime.datetime],
+    endtime: Union[str, datetime.datetime],
     interval: str,
-    expression: str = "",
+    expression: str,
 ) -> pd.DataFrame:
     """Returns dataframe that contains the result of evaluating the passed expression 
-    over the passed time range at a defined interval."""
+    over the passed time range at a defined interval.
+    
+    Expression arguments need to be entered as raw strings: r'expresion' """
     afrange = to_af_time_range(starttime, endtime)
     afinterval = AF.Time.AFTimeSpan.Parse(interval)
     result = AF.Data.AFCalculation.CalculateAtIntervals(
-        0, expression, afrange
+        0, expression, afrange, afinterval
     )
 
     if result:

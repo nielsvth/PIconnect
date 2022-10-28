@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Sep 27 09:43:44 2022
-
-@author: NVanthil
-"""
-
 import PIconnect
 
 # Set up timezone info
@@ -110,34 +103,26 @@ with PIconnect.PIAFDatabase(
     x = tag.interpolated_value("2022-10-20 18:54:38")
     print(x)
 
+    x = PIconnect.calc.calc_recorded(
+        "1-10-2022 14:00",
+        "1-10-2022 22:00",
+        r"IF ('\\ITSBEBEPIHISCOL\SINUSOID' > 70) THEN (Abs('\\ITSBEBEPIHISCOL\SINUSOID')) ELSE (0)",
+    )
+    print(x)
 
-    def calc_recorded(
-        starttime: Union[str, datetime.datetime] = None,
-        endtime: Union[str, datetime.datetime] = "*",
-        expression: str = "",
-    ) -> pd.DataFrame:
+    y = PIconnect.calc.calc_interpolated(
+        "1-10-2022 14:00",
+        "1-10-2022 22:00",
+        "1h",
+        r"IF ('\\ITSBEBEPIHISCOL\SINUSOID' > 70) THEN (Abs('\\ITSBEBEPIHISCOL\SINUSOID')+10) ELSE (0)",
+    )
+    print(y)
 
-        afrange = to_af_time_range(starttime, endtime)
-        result = AF.Data.AFCalculation.CalculateAtRecordedValues(
-            0, expression, afrange
-        )
+    y = PIconnect.calc.calc_interpolated(
+        "1-10-2022 14:00",
+        "1-10-2022 14:00",
+        "1h",
+        r"TagTot('\\ITSBEBEPIHISCOL\SINUSOID', '01-Oct-2022 14:00:00', '01-Oct-2022 22:00:00')",
+    )
 
-        if result:
-            # process query results
-            data = [list(result)]
-            df = pd.DataFrame(data).T
-            df.columns = ['calculation']
-            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm # noqa
-            df.index = df[df.columns[0]].apply(
-                lambda x: timestamp_to_index(x.Timestamp.UtcTime)
-            )
-            df.index.name = "Index"
-            df = df.applymap(lambda x: x.Value)
-        else:  # if no result, return empty dataframe
-            df = pd.DataFrame()
-
-        return df
-
-
-    x = calc_recorded("1-10-2022 14:00","1-10-2022 22:00", r"IF ('\\ITSBEBEPIHISCOL\SINUSOID' > 70) THEN (Abs('\\ITSBEBEPIHISCOL\SINUSOID')) ELSE (0)",)
-    print([y.Value for y in x])
+    print(y)

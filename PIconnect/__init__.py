@@ -6,6 +6,7 @@ from PIconnect.AFSDK import AF, AF_SDK_VERSION
 from PIconnect.config import PIConfig
 from PIconnect.PI import PIServer
 from PIconnect.PIAF import PIAFDatabase
+import PIconnect.calc
 
 # pragma pylint: enable=unused-import
 

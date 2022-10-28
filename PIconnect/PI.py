@@ -53,7 +53,12 @@ from PIconnect.PIConsts import (
     PIPointType,
     ExpressionSampleType,
 )
-from PIconnect.time import timestamp_to_index, to_af_time_range, add_timezone, to_af_time
+from PIconnect.time import (
+    timestamp_to_index,
+    to_af_time_range,
+    add_timezone,
+    to_af_time,
+)
 
 from collections import UserList
 
@@ -348,10 +353,7 @@ class Tag:
         """Return last recorded value"""
         return self.tag.CurrentValue().Value
 
-    def interpolated_value(
-        self,
-        time: Union[str, datetime.datetime]
-    ) -> int:
+    def interpolated_value(self, time: Union[str, datetime.datetime]) -> int:
         """Return interpolated value as specified time"""
         aftime = to_af_time(time)
         return self.tag.InterpolatedValue(aftime)
@@ -1128,7 +1130,7 @@ class TagList(UserList):
                 df[["Timestamp", "Value"]] = df["Timestamp"].apply(
                     pd.Series
                 )  # explode list to columns
-                df_final.append(df, ignore_index=True)
+                df_final = pd.concat([df_final, df], ignore_index=True)
 
             df_final = df_final[["Tag", "Summary", "Value", "Timestamp"]]
 
@@ -1238,7 +1240,7 @@ class TagList(UserList):
                 df[["Timestamp", "Value"]] = df["Timestamp"].apply(
                     pd.Series
                 )  # explode list to columns
-                df_final = df_final.append(df, ignore_index=True)
+                df_final = pd.concat([df_final, df], ignore_index=True)
 
             df_final = df_final[["Tag", "Summary", "Value", "Timestamp"]]
 
@@ -1300,7 +1302,13 @@ def convert_to_TagList(
         try:
             return TagList(tag_list)
         except:
-            return dataserver.find_tags(tag_list)
+            if dataserver:
+                return dataserver.find_tags(tag_list)
+            else:
+                raise AttributeError(
+                    "Specifiy a dataserver argument when using tags in string format"
+                )
+
 
 # Can't the user can simply use iPyKernel's display func, e.g. display(df)
 def view(dataframe: pd.DataFrame) -> pd.DataFrame:
