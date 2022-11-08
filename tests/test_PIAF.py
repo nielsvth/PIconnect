@@ -185,6 +185,12 @@ def test_eventhierarchy(af_connect):
         == 3
     ), "Column should contain 3 unique values"
 
+    # specify tag from list
+    eventhierarchy_1 = eventhierarchy.ehy.interpol_discrete_extract(
+        tag_list=["SINUSOID"], interval="1h", dataserver=server
+    )
+    assert eventhierarchy_1.shape == (154, 12), "shape should be (154, 12)"
+
 
 # created AFDatabase & EventDatabase from '.XML' files and use default PIserver
 # Every PIserver should have default SINUSOID Tag for testing purposes
@@ -202,16 +208,21 @@ with PIconnect.PIAFDatabase(
         attribute_names_list=["Equipment", "Manufacturer"],
         template_name="Unit_template",
     )
-    assert eventhierarchy.shape == (11, 9), "Shape should be (11,9)"
-    assert (
-        len(eventhierarchy["Equipment [Unit_template]"].unique()) == 3
-    ), "Column should contain 3 unique values"
 
     eventhierarchy = eventhierarchy.ehy.add_ref_elements(
         template_name="Operation_template"
     )
-    assert eventhierarchy.shape == (11, 10), "Shape should be (11,10)"
-    assert (
-        len(eventhierarchy["Referenced_el [Operation_template](0)"].unique())
-        == 3
-    ), "Column should contain 3 unique values"
+
+    # specify tag from list
+    # eventhierarchy_1 = eventhierarchy.ehy.interpol_discrete_extract(tag_list=["SINUSOID"], interval="1h", dataserver=server)
+    # assert eventhierarchy_1.shape == (154, 12), "shape should be (154, 12)"
+
+    # specify tag from column
+    eventhierarchy_2 = eventhierarchy.copy()
+    eventhierarchy_2["Tag"] = "SINUSOID"
+    eventhierarchy_2 = eventhierarchy_2.ehy.interpol_discrete_extract(
+        tag_list=["Tag"], interval="1h", dataserver=server, col=True
+    )
+
+    ##condense check if template available in hierarchy, or use level
+    # or remove option

@@ -1070,8 +1070,8 @@ class Event:
         self,
         tag_list: List[Union[str, Tag]],
         interval: str,
-        dataserver: PIServer = None,
         filter_expression: str = "",
+        dataserver: PIServer = None,
     ) -> pd.DataFrame:
         """Retrieve interpolated values for each Tag in TagList
 
@@ -1641,7 +1641,10 @@ class EventHierarchy:
                     lambda row: list(
                         row[event]
                         .interpolated_values(
-                            [row[tags]], interval, filter_expression
+                            [row[tags]],
+                            interval,
+                            filter_expression,
+                            dataserver,
                         )
                         .to_records(index=True)
                     ),
@@ -1895,7 +1898,9 @@ class CondensedEventHierarchy:
             df["Time"] = df["Event"].apply(
                 lambda x: list(
                     x.interpolated_values(
-                        taglist, interval, filter_expression
+                        taglist,
+                        interval,
+                        filter_expression,
                     ).to_records(index=True)
                 )
             )
@@ -1935,6 +1940,7 @@ class CondensedEventHierarchy:
 
             event = df.columns.get_loc("Event")
             tags = df.columns.get_loc("Tags")
+
             # extract interpolated data for discrete events
             df["Time"] = df.apply(
                 lambda row: list(
