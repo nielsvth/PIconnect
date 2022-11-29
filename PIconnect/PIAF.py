@@ -1555,8 +1555,10 @@ class EventHierarchy:
             ],
             inplace=True,
         )
-        # remove duplicates
-        df_condensed = df_condensed.drop_duplicates(keep="first")
+
+        # remove duplicates (issues with removing duplicates with pandas date objects)
+        df_condensed = df_condensed.iloc[df_condensed.astype(str).drop_duplicates(keep="first").index]
+        df_condensed.reset_index(inplace=True, drop=True)
 
         # address NaT times (copy value from parent layer)
         endtime_cols = [
@@ -1565,13 +1567,7 @@ class EventHierarchy:
             if col_name.startswith("Endtime")
         ]
         for i, col in enumerate(endtime_cols):
-            if i == 0:  # Handle naT in top layer: current time
-                local_tz = timezone(PIConfig.DEFAULT_TIMEZONE)
-                now = (
-                    datetime.utcnow().replace(tzinfo=utc).astimezone(local_tz)
-                )
-                df_condensed[col].fillna(now, inplace=True)
-            else:  # handle naT in lower layers by inheriting from parent
+            if not i == 0: # handle naT in lower layers by inheriting from parent
                 df_condensed[col].fillna(
                     df_condensed[endtime_cols[i - 1]], inplace=True
                 )
@@ -1790,12 +1786,12 @@ class EventHierarchy:
 
         df = df.explode("Time")  # explode list to rows
         df["Time"] = df["Time"].apply(
-            lambda x: [el for el in x]
+            lambda x: [el for el in x] if not pd.isnull(x) else np.nan
         )  # numpy record to list
         df[["Tag", "Summary", "Value", "Time"]] = df["Time"].apply(
             pd.Series
         )  # explode list to columns
-        df["Time"] = df["Time"].apply(lambda x: add_timezone(x))
+        df["Time"] = df["Time"].apply(lambda x: add_timezone(x) if not pd.isnull(x) else x)
         df.reset_index(drop=True, inplace=True)
 
         return df
