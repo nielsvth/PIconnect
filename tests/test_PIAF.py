@@ -191,6 +191,27 @@ def test_eventhierarchy(af_connect):
     )
     assert eventhierarchy_1.shape == (154, 12), "shape should be (154, 12)"
 
+    # specify tag from column
+    eventhierarchy_2 = eventhierarchy.copy()
+    eventhierarchy_2["Tag"] = "SINUSOID"
+
+    eventhierarchy_2 = eventhierarchy_2.ehy.interpol_discrete_extract(
+        tag_list=["Tag"], interval="1h", dataserver=server, col=True
+    )
+    assert eventhierarchy_1.shape[0] == eventhierarchy_2[0], "should have same length"
+
+    # Including non existent tag, will return no Error but a value Nan and time NaT
+    eventhierarchy_3 = eventhierarchy.copy()
+    eventhierarchy_3["Tag"] = "SINUSOID"
+    eventhierarchy_3["Tag"].iloc[10] = "SINUSOIiD"
+
+    eventhierarchy_3 = eventhierarchy_3.ehy.interpol_discrete_extract(
+        tag_list=["Tag"], interval="1h", dataserver=server, col=True
+    )
+    assert eventhierarchy_3.shape == (140, 13), "shape should be (140, 13)"
+    assert pd.isnull(eventhierarchy_3['Value'].iloc[-1]) == True
+
+
 
 # created AFDatabase & EventDatabase from '.XML' files and use default PIserver
 # Every PIserver should have default SINUSOID Tag for testing purposes
@@ -214,15 +235,28 @@ with PIconnect.PIAFDatabase(
     )
 
     # specify tag from list
-    # eventhierarchy_1 = eventhierarchy.ehy.interpol_discrete_extract(tag_list=["SINUSOID"], interval="1h", dataserver=server)
-    # assert eventhierarchy_1.shape == (154, 12), "shape should be (154, 12)"
+    eventhierarchy_1 = eventhierarchy.ehy.interpol_discrete_extract(tag_list=["SINUSOID"], interval="1h", dataserver=server)
+    assert eventhierarchy_1.shape == (154, 12), "shape should be (154, 12)"
 
     # specify tag from column
     eventhierarchy_2 = eventhierarchy.copy()
     eventhierarchy_2["Tag"] = "SINUSOID"
+
     eventhierarchy_2 = eventhierarchy_2.ehy.interpol_discrete_extract(
         tag_list=["Tag"], interval="1h", dataserver=server, col=True
     )
+    print(eventhierarchy_2.shape)
+    
+    #non existent tag, will return no Error but a value Nan and time NaT
+    eventhierarchy_2["Tag"].iloc[10] = "SINUSOIiD"
+
+    eventhierarchy_2 = eventhierarchy_2.ehy.interpol_discrete_extract(
+        tag_list=["Tag"], interval="1h", dataserver=server, col=True
+    )
+    assert eventhierarchy_2.shape == (140, 13)
+    assert pd.isnull(eventhierarchy_2['Value'].iloc[-1]) == True
+
+
 
     ##condense check if template available in hierarchy, or use level
     # or remove option

@@ -1360,8 +1360,7 @@ class Event:
         Returns:
             pd.DataFrame: Dataframe of event hierarchy.
         """
-        # TODO: lookup by template instead of number?
-        # - Level more constant then templates?
+        # Level better option than template names
         df_procedures = pd.DataFrame(
             [(self.eventframe, self.eventframe.GetPath())],
             columns=["Event", "Path"],
@@ -1658,12 +1657,20 @@ class EventHierarchy:
 
         df = df.explode("Time")  # explode list to rows
         df["Time"] = df["Time"].apply(
-            lambda x: [el for el in x]
+            lambda x: [el for el in x] if not pd.isnull(x) else np.nan
         )  # numpy record to list
-        df[["Time"] + [tag.name for tag in taglist]] = df["Time"].apply(
-            pd.Series
-        )  # explode list to columns
-        df["Time"] = df["Time"].apply(lambda x: add_timezone(x))
+
+        if not col:
+            df[["Time"] + [tag.name for tag in taglist]] = df["Time"].apply(
+                pd.Series
+            )  # explode list to columns
+        else:
+            df[["Time", "Value"]] = df["Time"].apply(
+                pd.Series
+            )  # explode list to columns
+        df["Time"] = df["Time"].apply(
+            lambda x: add_timezone(x) if not pd.isnull(x) else x
+        )
         df.reset_index(drop=True, inplace=True)
 
         return df
