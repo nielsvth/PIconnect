@@ -226,7 +226,7 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
                 + "got type "
                 + str(type(query))
             )
-        return TagList(
+        result = TagList(
             [
                 Tag(pi_point)
                 for pi_point in AF.PI.PIPoint.FindPIPoints(
@@ -234,6 +234,10 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
                 )
             ]
         )
+        if result:
+            return result
+        else:
+            raise AttributeError(f"No tags were found for query: {query}")
 
     def tag_overview(self, query: str) -> pd.DataFrame:
         """Returns dataframe containing overview for each tag that meets the

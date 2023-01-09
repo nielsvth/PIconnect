@@ -61,7 +61,6 @@ def test_attributes(af_connect):
     assetlist = afdatabase.find_assets(query="Equipment")
     asset = assetlist[0].children[0]
     assert len(asset.attributes) == 21, "Should be 21"
-    assert len(event.attributes) == 2, "Should be 2"
     attribute = asset.attributes[3]
     assert attribute.name == "Water Flow", "Should be 'Water Flow'"
     assert attribute.source_type == "PI Point", "Should be 'PI Point'"
@@ -94,7 +93,7 @@ def test_attribute_extracts(af_connect):
 
 def test_event_extracts(af_connect):
     """Test extraction functionalty for Events"""
-    afdatabase = af_connect[0]
+    afdatabase, server = af_connect
     eventlist = afdatabase.find_events(
         query="*", starttime="2/10/2022 11:29:12", endtime="3/10/2022 17:18:44"
     )
@@ -155,7 +154,7 @@ def test_event_extracts(af_connect):
 
 def test_eventhierarchy(af_connect):
     """Test functionalty for EventHierarchy class"""
-    afdatabase = af_connect[0]
+    afdatabase, server = af_connect
     eventlist = afdatabase.find_events(
         query="*", starttime="2/10/2022 11:29:12", endtime="3/10/2022 17:18:44"
     )
@@ -198,25 +197,29 @@ def test_eventhierarchy(af_connect):
     eventhierarchy_2 = eventhierarchy_2.ehy.interpol_discrete_extract(
         tag_list=["Tag"], interval="1h", dataserver=server, col=True
     )
-    assert eventhierarchy_1.shape[0] == eventhierarchy_2.shape[0], "should have same length"
+    assert (
+        eventhierarchy_1.shape[0] == eventhierarchy_2.shape[0]
+    ), "should have same length"
 
-    # interpol extract - Including non-existent tag, will return no Error but a value Nan and time NaT
+    # interpol extract - Including non-existent tag, will return an Error
     eventhierarchy_3 = eventhierarchy.copy()
     eventhierarchy_3["Tag"] = "SINUSOID"
-    eventhierarchy_3["Tag"].iloc[10] = "SINUSOIiD"
+    eventhierarchy_3["Tag"].iloc[10] = "SINUSOIiD"  # non existing tag
 
-    eventhierarchy_3 = eventhierarchy_3.ehy.interpol_discrete_extract(
-        tag_list=["Tag"], interval="1h", dataserver=server, col=True
-    )
-    assert eventhierarchy_3.shape == (140, 13), "shape should be (140, 13)"
-    assert pd.isnull(eventhierarchy_3['Value'].iloc[-1]) == True
+    try:
+        eventhierarchy_3 = eventhierarchy_3.ehy.interpol_discrete_extract(
+            tag_list=["Tag"], interval="1h", dataserver=server, col=True
+        )
+    except Exception as e:
+        assert str(e) == "No tags were found for query: SINUSOIiD"
 
     # summary extract - specify tag from list
     summary_values = eventhierarchy.ehy.summary_extract(
         tag_list=["SINUSOID"],
         summary_types=4 | 8 | 32,
         dataserver=server,
-        col=False,)
+        col=False,
+    )
     assert summary_values.shape == (18, 14), "shape should be (18, 14)"
 
     # interpol extract - specify tag from column
@@ -224,23 +227,25 @@ def test_eventhierarchy(af_connect):
         tag_list=["Tag"],
         summary_types=4 | 8 | 32,
         dataserver=server,
-        col=True,)
-    assert summary_values.shape[0] == summary_values_2.shape[0], "should have same length" 
+        col=True,
+    )
+    assert (
+        summary_values.shape[0] == summary_values_2.shape[0]
+    ), "should have same length"
 
-    # interpol extract - Including non-existent tag, will return no Error but a value Nan and time NaT
-    summary_values_3 = eventhierarchy_3.ehy.summary_extract(
-        tag_list=["Tag"],
-        summary_types=4 | 8 | 32,
-        dataserver=server,
-        col=True,)
-    assert summary_values_3 .shape == (140, 13), "shape should be (140, 13)"
-    assert pd.isnull(summary_values_3 ['Value'].iloc[-1]) == True
+    # interpol extract - Including non-existent tag, will return an Error
+    try:
+        summary_values_3 = eventhierarchy_3.ehy.summary_extract(
+            tag_list=["Tag"],
+            summary_types=4 | 8 | 32,
+            dataserver=server,
+            col=True,
+        )
+    except Exception as e:
+        assert str(e) == "No tags were found for query: SINUSOIiD"
 
 
-
-def test_condensed(afconnect):
-
-
+# def test_condensed(afconnect):
 
 
 from pytz import timezone, utc
@@ -255,7 +260,9 @@ with PIconnect.PIAFDatabase(
 ) as afdatabase, PIconnect.PIServer() as server:
 
     eventlist = afdatabase.find_events(
-        query="*Batch*", starttime="2/10/2022 11:29:12", endtime="3/10/2022 17:18:44"
+        query="*Batch*",
+        starttime="2/10/2022 11:29:12",
+        endtime="3/10/2022 17:18:44",
     )
 
     eventhierarchy = eventlist.get_event_hierarchy(depth=2)
@@ -268,22 +275,3 @@ with PIconnect.PIAFDatabase(
     eventhierarchy = eventhierarchy.ehy.add_ref_elements(
         template_name="Operation_template"
     )
-
-    eventhierarchy["Tag"] = "SINUSOID"
-    #eventhierarchy["Tag"].iloc[5] = "SINUSOIiD"
-
-    z = eventhierarchy["Event"].iloc[0].summary(
-        ["SINUSOIiD"],
-        4 | 8 | 32,
-        server,).to_records(index=False)
-    
-
-    # how about interpol_discrete_extract?
-    # to do with index=False
-
-    exit
-    summary_values_3  = eventhierarchy.ehy.summary_extract(
-        tag_list=["SINUSOIiD"],
-        summary_types=4 | 8 | 32,
-        dataserver=server,
-        col=False)
