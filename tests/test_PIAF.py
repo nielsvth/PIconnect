@@ -123,6 +123,16 @@ def test_event_extracts(af_connect):
         1,
     ), "Output shape should not (10,1)"
 
+    # gives error when non-existent tag is used
+    try:
+        result = event.recorded_values(
+            tag_list=["SINUSOIiD"],
+            filter_expression="'SINUSOID' >= 0",
+            dataserver=server,
+        )
+    except Exception as e:
+        assert str(e) == "No tags were found for query: SINUSOIiD"
+
     # summary
     result = event.summary(
         tag_list=["SINUSOID"], summary_types=4 | 8 | 128, dataserver=server
@@ -185,42 +195,43 @@ def test_eventhierarchy(af_connect):
     ), "Column should contain 3 unique values"
 
     # interpol extract - specify tag from list
-    eventhierarchy_1 = eventhierarchy.ehy.interpol_discrete_extract(
+    eventhierarchy_1 = eventhierarchy.copy()
+    interpol_values_1 = eventhierarchy_1.ehy.interpol_discrete_extract(
         tag_list=["SINUSOID"], interval="1h", dataserver=server
     )
-    assert eventhierarchy_1.shape == (154, 12), "shape should be (154, 12)"
+    assert interpol_values_1.shape == (154, 12), "shape should be (154, 12)"
 
     # interpol extract - specify tag from column
     eventhierarchy_2 = eventhierarchy.copy()
     eventhierarchy_2["Tag"] = "SINUSOID"
 
-    eventhierarchy_2 = eventhierarchy_2.ehy.interpol_discrete_extract(
+    interpol_values_2 = eventhierarchy_2.ehy.interpol_discrete_extract(
         tag_list=["Tag"], interval="1h", dataserver=server, col=True
     )
     assert (
-        eventhierarchy_1.shape[0] == eventhierarchy_2.shape[0]
+        interpol_values_1.shape[0] == interpol_values_2.shape[0]
     ), "should have same length"
 
     # interpol extract - Including non-existent tag, will return an Error
     eventhierarchy_3 = eventhierarchy.copy()
     eventhierarchy_3["Tag"] = "SINUSOID"
-    eventhierarchy_3["Tag"].iloc[10] = "SINUSOIiD"  # non existing tag
+    eventhierarchy_3["Tag"].iloc[4] = "SINUSOIiD"  # non existing tag
 
     try:
-        eventhierarchy_3 = eventhierarchy_3.ehy.interpol_discrete_extract(
+        interpol_values_3 = eventhierarchy_3.ehy.interpol_discrete_extract(
             tag_list=["Tag"], interval="1h", dataserver=server, col=True
         )
     except Exception as e:
         assert str(e) == "No tags were found for query: SINUSOIiD"
 
     # summary extract - specify tag from list
-    summary_values = eventhierarchy.ehy.summary_extract(
+    summary_values = eventhierarchy_1.ehy.summary_extract(
         tag_list=["SINUSOID"],
         summary_types=4 | 8 | 32,
         dataserver=server,
         col=False,
     )
-    assert summary_values.shape == (18, 14), "shape should be (18, 14)"
+    assert summary_values.shape == (33, 14), "shape should be (33, 14)"
 
     # interpol extract - specify tag from column
     summary_values_2 = eventhierarchy_2.ehy.summary_extract(
@@ -249,7 +260,6 @@ def test_eventhierarchy(af_connect):
 
 
 from pytz import timezone, utc
-from datetime import datetime
 from PIconnect.config import PIConfig
 
 
@@ -260,7 +270,7 @@ with PIconnect.PIAFDatabase(
 ) as afdatabase, PIconnect.PIServer() as server:
 
     eventlist = afdatabase.find_events(
-        query="*Batch*",
+        query="*",
         starttime="2/10/2022 11:29:12",
         endtime="3/10/2022 17:18:44",
     )
@@ -274,4 +284,13 @@ with PIconnect.PIAFDatabase(
 
     eventhierarchy = eventhierarchy.ehy.add_ref_elements(
         template_name="Operation_template"
+    )
+
+    print(eventhierarchy.shape)
+
+    summary_values = eventhierarchy.ehy.summary_extract(
+        tag_list=["SINUSOID"],
+        summary_types=4 | 8 | 32,
+        dataserver=server,
+        col=False,
     )

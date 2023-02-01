@@ -18,6 +18,7 @@ def test_find_tags(af_connect):
     """Test to find Tags on AFDatabase"""
     # create AFDatabase & EventDatabase from '.XML' files and use default PIserver
     # SINUSOID is a default tag available on any PIServer
+    server = af_connect[1]
     taglist = server.find_tags("SINUSOID")
     assert len(taglist) == 1, "Should be 1"
     tag = taglist[0]
