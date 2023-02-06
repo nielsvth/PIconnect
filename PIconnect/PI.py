@@ -876,8 +876,7 @@ class TagList(UserList):
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         AFTimeRange = to_af_time_range(starttime, endtime)
 
-        # Could have issues with quering multiple PI Data Archives
-        # simultanously, see documentation
+        # Could have issues with quering multiple PI Data Archives simultanously, see documentation
         # https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_InterpolatedValues.htm # noqa
         result = PIPointlist.InterpolatedValues(
             AFTimeRange,

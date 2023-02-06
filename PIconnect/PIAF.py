@@ -1966,12 +1966,19 @@ class CondensedEventHierarchy:
 
         df = df.explode("Time")  # explode list to rows
         df["Time"] = df["Time"].apply(
-            lambda x: [el for el in x]
+            lambda x: [el for el in x] if not pd.isnull(x) else np.nan
         )  # numpy record to list
-        df[["Time"] + [tag.name for tag in taglist]] = df["Time"].apply(
-            pd.Series
-        )  # explode list to columns
-        df["Time"] = df["Time"].apply(lambda x: add_timezone(x))
+        if not col:
+            df[["Time"] + [tag.name for tag in taglist]] = df["Time"].apply(
+                pd.Series
+            )  # explode list to columns
+        else:
+            df[["Time", "Value"]] = df["Time"].apply(
+                pd.Series
+            )  # explode list to columns
+        df["Time"] = df["Time"].apply(
+            lambda x: add_timezone(x) if not pd.isnull(x) else x
+        )
         df.reset_index(drop=True, inplace=True)
 
         return df
@@ -2025,8 +2032,13 @@ class CondensedEventHierarchy:
                     starttime, endtime, interval, filter_expression
                 ).to_records(index=True)
             )
-            df_cont = df_cont.append(
-                pd.DataFrame([[proc, values]], columns=["Procedure", "Time"]),
+            df_cont = pd.concat(
+                [
+                    df_cont,
+                    pd.DataFrame(
+                        [[proc, values]], columns=["Procedure", "Time"]
+                    ),
+                ],
                 ignore_index=True,
             )
 
@@ -2141,7 +2153,7 @@ class CondensedEventHierarchy:
     ) -> Dict[str, Dict[str, pd.DataFrame]]:
         """Return nested dictionary (level 1: Procedures, Level 2: Tags) of
         continuous plot values from the start of the first filtered event to
-        the end of the last filtered event for each procedure on bottom level
+        the end of the last filtered event for each procedure on the bottom level
         of condensed hierarchy. Each interval can produce up to 5 values if
         they are unique, the first value in the interval, the last value, the
         highest value, the lowest value and at most one exceptional point (bad
@@ -2202,8 +2214,6 @@ class CondensedEventHierarchy:
             dct[proc] = values
         return dct
 
-    # option to specify column with tagnames to refer to instead of taglist?
-
     def summary_extract(
         self,
         tag_list: List[Union[str, Tag]],
@@ -2258,31 +2268,33 @@ class CondensedEventHierarchy:
             pd.DataFrame: Resultant dataframe
         """
 
-        print("building discrete extract table from condensed hierachy...")
-        # select events on bottem level of condensed hierarchy
+        print("building summary table from condensed hierachy...")
+        df = self.df.copy()
+
+        # select events on bottom level of condensed hierarchy
         col_event = [
             col_name
             for col_name in self.df.columns
             if col_name.startswith("Event")
         ][-1]
 
+        # performance checks
+        maxi = max(df[col_event].apply(lambda x: x.duration))
+        if maxi > pd.Timedelta("60 days"):
+            print(
+                f"Large Event(s) with duration up to {maxi} detected, "
+                + "Note that this might take some time..."
+            )
+        if len(df) > 50:
+            print(
+                f"Summaries will be calculated for {len(df)} Events, Note"
+                + " that this might take some time..."
+            )
+
         # based on list of tags
         if not col:
             df = self.df[[col_event]].copy()
             df.columns = ["Event"]
-
-            # performance checks
-            maxi = max(df["Event"].apply(lambda x: x.duration))
-            if maxi > pd.Timedelta("60 days"):
-                print(
-                    f"Large Event(s) with duration up to {maxi} detected, "
-                    + "Note that this might take some time..."
-                )
-            if len(df) > 50:
-                print(
-                    f"Summaries will be calculated for {len(df)} Events, "
-                    + "Note that this might take some time..."
-                )
 
             # add procedure names
             df["Procedure"] = df["Event"].apply(lambda x: x.top_event)
@@ -2312,19 +2324,6 @@ class CondensedEventHierarchy:
                 raise AttributeError(
                     f"The column option was set to True, but {tag_list} is "
                     + "not a valid column"
-                )
-
-            # performance checks
-            maxi = max(df["Event"].apply(lambda x: x.duration))
-            if maxi > pd.Timedelta("60 days"):
-                print(
-                    f"Large Event(s) with duration up to {maxi} detected, "
-                    + "Note that this might take some time..."
-                )
-            if len(df) > 50:
-                print(
-                    f"Summaries will be calculated for {len(df)} Events, "
-                    + "Note that this might take some time..."
                 )
 
             # add procedure names

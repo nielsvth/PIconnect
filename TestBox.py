@@ -118,11 +118,12 @@ with PIconnect.PIAFDatabase(
     )
     print(y)
 
+    # https://docs.osisoft.com/bundle/pi-server/page/tagtot.html
     y = PIconnect.calc.calc_interpolated(
         "1-10-2022 14:00",
         "1-10-2022 14:00",
         "1h",
-        r"TagTot('\\ITSBEBEPIHISCOL\SINUSOID', '01-Oct-2022 14:00:00', '01-Oct-2022 22:00:00')",
+        r"TagTot('\\ITSBEBEPIHISCOL\SINUSOID', '01-Oct-2022 14:00:00', '03-Oct-2022 14:00:00')",
     )
 
     print(y)

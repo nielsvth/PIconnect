@@ -242,6 +242,7 @@ class EventFrameSearchMode(IntEnum):
 
 
 class SearchMode(IntEnum):
+    # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_EventFrame_AFEventFrameSearchMode.htm
     NONE = 0
     START_INCLUSIVE = 1
     END_INCLUSIVE = 2

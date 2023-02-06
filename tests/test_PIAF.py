@@ -212,7 +212,7 @@ def test_eventhierarchy(af_connect):
         interpol_values_1.shape[0] == interpol_values_2.shape[0]
     ), "should have same length"
 
-    # interpol extract - Including non-existent tag, will return an Error
+    # interpol extract - including non-existent tag, will return an Error
     eventhierarchy_3 = eventhierarchy.copy()
     eventhierarchy_3["Tag"] = "SINUSOID"
     eventhierarchy_3["Tag"].iloc[4] = "SINUSOIiD"  # non existing tag
@@ -233,7 +233,7 @@ def test_eventhierarchy(af_connect):
     )
     assert summary_values.shape == (33, 14), "shape should be (33, 14)"
 
-    # interpol extract - specify tag from column
+    # summary extract - specify tag from column
     summary_values_2 = eventhierarchy_2.ehy.summary_extract(
         tag_list=["Tag"],
         summary_types=4 | 8 | 32,
@@ -244,7 +244,7 @@ def test_eventhierarchy(af_connect):
         summary_values.shape[0] == summary_values_2.shape[0]
     ), "should have same length"
 
-    # interpol extract - Including non-existent tag, will return an Error
+    # interpol extract - including non-existent tag, will return an Error
     try:
         summary_values_3 = eventhierarchy_3.ehy.summary_extract(
             tag_list=["Tag"],
@@ -256,7 +256,138 @@ def test_eventhierarchy(af_connect):
         assert str(e) == "No tags were found for query: SINUSOIiD"
 
 
-# def test_condensed(afconnect):
+def test_condensed(af_connect):
+    """Test functionalty for EventHierarchy class"""
+    afdatabase, server = af_connect
+    eventlist = afdatabase.find_events(
+        query="*", starttime="2/10/2022 11:29:12", endtime="3/10/2022 17:18:44"
+    )
+    eventhierarchy = eventlist.get_event_hierarchy(depth=2)
+
+    # add attributes
+    eventhierarchy = eventhierarchy.ehy.add_attributes(
+        attribute_names_list=["Equipment", "Manufacturer"],
+        template_name="Unit_template",
+    )
+
+    # add referenced elements
+    eventhierarchy = eventhierarchy.ehy.add_ref_elements(
+        template_name="Operation_template"
+    )
+
+    # create condensed dataframe
+    condensed = eventhierarchy.ehy.condense()
+
+    # interpol-disecrete extract, including filter expression, specify tag from list
+    disc_interpol_values = condensed.ecd.interpol_discrete_extract(
+        tag_list=["SINUSOID"],
+        interval="1m",
+        filter_expression="'SINUSOID' > 40",
+        dataserver=server,
+        col=False,
+    )
+    assert disc_interpol_values.shape == (1163, 4), "shape should be (1163,4)"
+    assert (
+        disc_interpol_values["SINUSOID"].min() == 40.02945
+    ), "filtered minimum value should be 40.02945"
+
+    # interpol-disecrete extract, including non-existent tag, will return an Error
+    try:
+        disc_interpol_values = condensed.ecd.interpol_discrete_extract(
+            tag_list=["SINUSOIiD"],
+            interval="1m",
+            filter_expression="'SINUSOID' > 40",
+            dataserver=server,
+            col=False,
+        )
+    except Exception as e:
+        assert str(e) == "No tags were found for query: SINUSOIiD"
+
+    # add Tag columns
+    condensed["Tag"] = "SINUSOID"
+    condensed["Tag"].iloc[0] = "SINUSOIDU"
+
+    # interpol-disecrete extract, including filter expression, specify tag from col
+    disc_interpol_values = condensed.ecd.interpol_discrete_extract(
+        tag_list=["Tag"],
+        interval="1m",
+        filter_expression="'SINUSOID' > 40",
+        dataserver=server,
+        col=True,
+    )
+    assert disc_interpol_values.shape == (1163, 5), "shape should be (1163,5)"
+    assert (
+        disc_interpol_values["Value"].min() == 3.387192
+    ), "filtered minimum value should be 3.387192"
+
+    # contin-disecrete extract, including filter expression
+    disc_interpol_values = condensed.ecd.interpol_continuous_extract(
+        tag_list=["SINUSOID"],
+        interval="1m",
+        filter_expression="'SINUSOID' > 40",
+        dataserver=server,
+    )
+    assert disc_interpol_values.shape == (1161, 4), "shape should be (1161,4)"
+    assert (
+        disc_interpol_values["SINUSOID"].min() == 40.02945
+    ), "filtered minimum value should be 40.02945"
+
+    # recorded extract, including filter expression
+    rec_values = condensed.ecd.recorded_extract(
+        tag_list=["SINUSOID"],
+        filter_expression="'SINUSOID' > 40",
+        dataserver=server,
+    )
+    assert rec_values["EventFrames[Batch A]"]["SINUSOID"].shape == (
+        13,
+        3,
+    ), "shape should be (13,3)"
+    assert (
+        rec_values["EventFrames[Batch A]"]["SINUSOID"]["Data"].min()
+        == 67.43513
+    ), "filtered minimum value should be 67.43513"
+
+    # plot extract
+    plot_values = condensed.ecd.plot_continuous_extract(
+        tag_list=["SINUSOID"],
+        nr_of_intervals=5,
+        dataserver=server,
+    )
+    assert plot_values["EventFrames[Batch A]"]["SINUSOID"].shape == (
+        15,
+        3,
+    ), "shape should be (13,3)"
+    assert (
+        plot_values["EventFrames[Batch A]"]["SINUSOID"]["Data"].min()
+        == 0.7622223
+    ), "minimum value should be 0.7622223"
+
+    # summary extract, tags from taglist
+    summary_values = condensed.ecd.summary_extract(
+        tag_list=["SINUSOID"],
+        summary_types=4 | 8 | 32,
+        dataserver=server,
+        col=False,
+    )
+    assert summary_values.shape == (9, 6), "shape should be (9,7)"
+    assert (
+        summary_values["Value"].min() == 0.7622223496437073
+    ), "minimum value should be 0.7622223496437073"
+
+    # ad Tag column to condensed dataframe
+    condensed["Tag"] = "SINUSOID"
+
+    # summary extract, tags from column
+    summary_values = condensed.ecd.summary_extract(
+        tag_list=["Tag"],
+        summary_types=4 | 8 | 32,
+        dataserver=server,
+        col=True,
+    )
+    assert summary_values.shape == (9, 7), "shape should be (9,7)"
+    assert (
+        summary_values["Value"].min() == 0.7622223496437073
+    ), "minimum value should be 0.7622223496437073"
 
 
 from pytz import timezone, utc
@@ -288,9 +419,39 @@ with PIconnect.PIAFDatabase(
 
     print(eventhierarchy.shape)
 
-    summary_values = eventhierarchy.ehy.summary_extract(
+    condensed = eventhierarchy.ehy.condense()
+
+    # summary extract, tags from taglist
+    summary_values = condensed.ecd.summary_extract(
         tag_list=["SINUSOID"],
         summary_types=4 | 8 | 32,
         dataserver=server,
         col=False,
     )
+    assert summary_values.shape == (9, 6), "shape should be (9,7)"
+    assert (
+        summary_values["Value"].min() == 0.7622223496437073
+    ), "minimum value should be 0.7622223496437073"
+
+    # ad Tag column to condensed dataframe
+    condensed["Tag"] = "SINUSOID"
+
+    # summary extract, tags from column
+    summary_values = condensed.ecd.summary_extract(
+        tag_list=["Tag"],
+        summary_types=4 | 8 | 32,
+        dataserver=server,
+        col=True,
+    )
+    assert summary_values.shape == (9, 7), "shape should be (9,7)"
+    assert (
+        summary_values["Value"].min() == 0.7622223496437073
+    ), "minimum value should be 0.7622223496437073"
+
+    dataservers = list(PIconnect.PIServer.servers.keys())
+    print(dataservers)
+
+    with PIconnect.PIServer('ANSRVPDA_COLL') as server:
+        taglist = server.find_tags("*080:D58:BAT.BATCHCOD*")
+        tag = taglist[0]
+        result = tag.interpolated_values(starttime="*-100d", endtime="*", interval="1d")

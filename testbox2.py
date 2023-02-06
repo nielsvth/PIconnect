@@ -1,7 +1,7 @@
 import PIconnect
 
 # Set up timezone info
-PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
+# PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
 
 with PIconnect.PIAFDatabase(
     server="PIMS_EU_BEERSE_AF_PE", database="Geel_CRB_Batch_Events"
