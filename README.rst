@@ -6,8 +6,8 @@ A Python connector to the OSISoft PI AF SDK
 ========================================================
 
 PIconnect provides a programmatic interface in Python to the OSISoft PI AF SDK. 
-This branch expands upon the PIconnect package to include additional functionality for working with Assets and (hierarchical) EventFrames.
-It also provides added functionality for executing bulk queries. 
+This branch expands upon the PIconnect package to include additional functionality for working with Assets, Attributes and (hierarchical) EventFrames.
+It also provides functionality for executing bulk queries and calculations. 
 
 The basic introduction to working with the PIconnect package is covered in the Tutorial below.
 
