@@ -354,13 +354,21 @@ class Tag:
 
     # Methods
     def current_value(self) -> int:
-        """Return last recorded value"""
-        return self.tag.CurrentValue().Value
+        """Return tuple of current time and last recorded value"""
+        return (
+            timestamp_to_index(self.tag.CurrentValue().Timestamp.UtcTime),
+            self.tag.CurrentValue().Value,
+        )
 
     def interpolated_value(self, time: Union[str, datetime.datetime]) -> int:
-        """Return interpolated value as specified time"""
+        """Return tuple of specified time and interpolated value at specified time"""
         aftime = to_af_time(time)
-        return self.tag.InterpolatedValue(aftime)
+        return (
+            timestamp_to_index(
+                self.tag.InterpolatedValue(aftime).Timestamp.UtcTime
+            ),
+            self.tag.InterpolatedValue(aftime).Value,
+        )
 
     def interpolated_values(
         self,
@@ -686,7 +694,7 @@ class Tag:
         interval: str,
         summary_types: int,
         filter_expression: str,
-        calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
+        calculation_basis: CalculationBasis = CalculationBasis.EVENT_WEIGHTED,
         time_type: TimestampCalculation = TimestampCalculation.AUTO,
         AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.EXPRESSION_RECORDED_VALUES,  # noqa
         filter_interval: str = None,
@@ -729,7 +737,7 @@ class Tag:
             filter_expression (str):  Filter expression.
             calculation_basis (CalculationBasis, optional): Basis by which to
                 calculate the summary statistic.
-                Defaults to CalculationBasis.TIME_WEIGHTED.
+                Defaults to CalculationBasis.EVENT_WEIGHTED.
             time_type (TimestampCalculation, optional): How the timestamp is
                 calculated. Defaults to TimestampCalculation.AUTO.
             AFfilter_evaluation (ExpressionSampleType, optional): Expression
@@ -784,7 +792,7 @@ class TagList(UserList):
                     + f"{type(tag)} to TagList object"
                 )
 
-    def current_values(self) -> pd.DataFrame:
+    def current_value(self) -> pd.DataFrame:
         """Getter method for current values of all tags in list
 
         Returns:
@@ -795,7 +803,34 @@ class TagList(UserList):
         if result:
             values = [x.Value for x in result]
             tags = [x.PIPoint.Name for x in result]
-            out = pd.DataFrame([values], columns=tags)
+            out = pd.DataFrame(
+                [values],
+                columns=tags,
+                index=[timestamp_to_index(result[0].Timestamp.UtcTime)],
+            )
+        else:
+            out = pd.DataFrame()
+        return out
+
+    def interpolated_value(
+        self, time: Union[str, datetime.datetime]
+    ) -> pd.DataFrame:
+        """Return interpolated value at specified time for all tags in list
+
+        Returns:
+            pd.DataFrame: values of all tags with names as the column
+        """
+        PIPointlist = generate_pipointlist(self)
+        aftime = to_af_time(time)
+        result = PIPointlist.InterpolatedValue(aftime)
+        if result:
+            values = [x.Value for x in result]
+            tags = [x.PIPoint.Name for x in result]
+            out = pd.DataFrame(
+                [values],
+                columns=tags,
+                index=[timestamp_to_index(aftime.UtcTime)],
+            )
         else:
             out = pd.DataFrame()
         return out
@@ -1147,7 +1182,7 @@ class TagList(UserList):
         interval: str,
         summary_types: int,
         filter_expression: str,
-        calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
+        calculation_basis: CalculationBasis = CalculationBasis.EVENT_WEIGHTED,
         time_type: TimestampCalculation = TimestampCalculation.AUTO,
         AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.EXPRESSION_RECORDED_VALUES,  # noqa
         filter_interval: str = None,
@@ -1190,7 +1225,7 @@ class TagList(UserList):
             filter_expression (str):  Filter expression.
             calculation_basis (CalculationBasis, optional): Basis by which to
                 calculate the summary statistic.
-                Defaults to CalculationBasis.TIME_WEIGHTED.
+                Defaults to CalculationBasis.EVENT_WEIGHTED.
             time_type (TimestampCalculation, optional): How the timestamp is
                 calculated. Defaults to TimestampCalculation.AUTO.
             AFfilter_evaluation (ExpressionSampleType, optional): Expression

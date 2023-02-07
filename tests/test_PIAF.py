@@ -257,7 +257,7 @@ def test_eventhierarchy(af_connect):
 
 
 def test_condensed(af_connect):
-    """Test functionalty for EventHierarchy class"""
+    """Test functionalty for CondensedHierarchy class"""
     afdatabase, server = af_connect
     eventlist = afdatabase.find_events(
         query="*", starttime="2/10/2022 11:29:12", endtime="3/10/2022 17:18:44"
@@ -388,70 +388,3 @@ def test_condensed(af_connect):
     assert (
         summary_values["Value"].min() == 0.7622223496437073
     ), "minimum value should be 0.7622223496437073"
-
-
-from pytz import timezone, utc
-from PIconnect.config import PIConfig
-
-
-# created AFDatabase & EventDatabase from '.XML' files and use default PIserver
-# Every PIserver should have default SINUSOID Tag for testing purposes
-with PIconnect.PIAFDatabase(
-    server="ITSBEBEWSP06182 DEV", database="NuGreen"
-) as afdatabase, PIconnect.PIServer() as server:
-
-    eventlist = afdatabase.find_events(
-        query="*",
-        starttime="2/10/2022 11:29:12",
-        endtime="3/10/2022 17:18:44",
-    )
-
-    eventhierarchy = eventlist.get_event_hierarchy(depth=2)
-
-    eventhierarchy = eventhierarchy.ehy.add_attributes(
-        attribute_names_list=["Equipment", "Manufacturer"],
-        template_name="Unit_template",
-    )
-
-    eventhierarchy = eventhierarchy.ehy.add_ref_elements(
-        template_name="Operation_template"
-    )
-
-    print(eventhierarchy.shape)
-
-    condensed = eventhierarchy.ehy.condense()
-
-    # summary extract, tags from taglist
-    summary_values = condensed.ecd.summary_extract(
-        tag_list=["SINUSOID"],
-        summary_types=4 | 8 | 32,
-        dataserver=server,
-        col=False,
-    )
-    assert summary_values.shape == (9, 6), "shape should be (9,7)"
-    assert (
-        summary_values["Value"].min() == 0.7622223496437073
-    ), "minimum value should be 0.7622223496437073"
-
-    # ad Tag column to condensed dataframe
-    condensed["Tag"] = "SINUSOID"
-
-    # summary extract, tags from column
-    summary_values = condensed.ecd.summary_extract(
-        tag_list=["Tag"],
-        summary_types=4 | 8 | 32,
-        dataserver=server,
-        col=True,
-    )
-    assert summary_values.shape == (9, 7), "shape should be (9,7)"
-    assert (
-        summary_values["Value"].min() == 0.7622223496437073
-    ), "minimum value should be 0.7622223496437073"
-
-    dataservers = list(PIconnect.PIServer.servers.keys())
-    print(dataservers)
-
-    with PIconnect.PIServer('ANSRVPDA_COLL') as server:
-        taglist = server.find_tags("*080:D58:BAT.BATCHCOD*")
-        tag = taglist[0]
-        result = tag.interpolated_values(starttime="*-100d", endtime="*", interval="1d")

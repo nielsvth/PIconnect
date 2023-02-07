@@ -1,0 +1,60 @@
+"""Unit Tests for calc.py Module""" ""
+
+import PIconnect
+import datetime
+import pandas as pd
+
+# Set up timezone info
+PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
+
+
+def test_connection():
+    """Test to check for connected servers"""
+    assert (
+        len(PIconnect.PIServer.servers) >= 1
+    ), "Should be larger or equal to 1"
+
+
+def test_calc_recorded(af_connect):
+    """Test functionalty of Calculation class: recorded values"""
+    server = af_connect[1]
+    tag = server.find_tags("SINUSOID")[0]
+
+    calc1 = PIconnect.calc.calc_recorded(
+        "1-10-2022 14:00",
+        "1-10-2022 22:00",
+        r"IF ('\\ITSBEBEPIHISCOL\SINUSOID' > 70) THEN (Abs('\\ITSBEBEPIHISCOL\SINUSOID')) ELSE (0)",
+    )
+    assert calc1.shape == (8, 1), "shape should be (8,1)"
+    assert (
+        calc1["calculation"].iloc[0]
+        == tag.interpolated_value("2022-10-01 14:00:00")[1]
+    ), "Should be 91.82201"
+
+
+def test_calc_interpol(af_connect):
+    """Test functionalty of Calculation class: interpolated values"""
+
+    calc2 = PIconnect.calc.calc_interpolated(
+        "1-10-2022 14:00",
+        "1-10-2022 22:00",
+        "1h",
+        r"IF ('\\ITSBEBEPIHISCOL\SINUSOID' > 70) THEN (Abs('\\ITSBEBEPIHISCOL\SINUSOID')+10) ELSE (0)",
+    )
+    assert calc2.shape == (9, 1), "shape should be (9,1)"
+    assert (
+        calc2["calculation"].iloc[0] == 101.82200659857855
+    ), "Should be 101.82200659857855"
+
+    # https://docs.osisoft.com/bundle/pi-server/page/tagtot.html
+    # returns totalized value per minute, do *1440 to get per day
+    calc3 = PIconnect.calc.calc_interpolated(
+        "1-10-2022 14:00",
+        "1-10-2022 14:00",
+        "1h",
+        r"TagTot('\\ITSBEBEPIHISCOL\SINUSOID', '01-Oct-2022 14:00:00', '03-Oct-2022 14:00:00')",
+    )
+    assert len(calc3) == 2, "Table length should be 2"
+    assert (
+        calc3["calculation"].iloc[0] == 99.99850612803398
+    ), "Value should be 99.99850612803398"

@@ -63,7 +63,7 @@ def to_af_time(time: Union[str, datetime]) -> AF.Time.AFTime:
 
 
 def timestamp_to_index(timestamp):
-    """Convert AFTime object to datetime in local timezone.
+    """Convert System.DateTime to datetime in local timezone.
 
     Args:
         timestamp (`System.DateTime`): Timestamp in .NET format to convert to
@@ -76,18 +76,15 @@ def timestamp_to_index(timestamp):
     """
     try:  # issue of converting infite endtimes, now defaulted to timezone
         # unaware infinite timezone
-        if (
-            datetime(
-                timestamp.Year,
-                timestamp.Month,
-                timestamp.Day,
-                timestamp.Hour,
-                timestamp.Minute,
-                timestamp.Second,
-                timestamp.Millisecond * 1000,
-            )
-            == datetime(9999, 12, 31, 23, 59, 59)
-        ):
+        if datetime(
+            timestamp.Year,
+            timestamp.Month,
+            timestamp.Day,
+            timestamp.Hour,
+            timestamp.Minute,
+            timestamp.Second,
+            timestamp.Millisecond * 1000,
+        ) == datetime(9999, 12, 31, 23, 59, 59):
             return np.nan
 
         else:
