@@ -5,9 +5,9 @@ PIconnect
 A Python connector to the OSISoft PI AF SDK
 ========================================================
 
-PIconnect provides a programmatic interface in Python to the OSISoft PI AF SDK. 
-This branch expands upon the PIconnect package to include additional functionality for working with Assets and (hierarchical) EventFrames.
-It also provides added functionality for executing bulk queries. 
+'nielsvth/PIconnect' provides a programmatic interface in Python to the OSISoft PI AF SDK. 
+This branch expands upon the 'Hugovdberg/PIconnect' package to include additional functionality for working with Assets, Attributes and (hierarchical) EventFrames.
+It also provides functionality for executing bulk queries and calculations. 
 
 The basic introduction to working with the PIconnect package is covered in the Tutorial below.
 
@@ -20,10 +20,10 @@ Tutorial
 *******************************************************
 
 .. code-block:: python
-
-    import PIconnect
-
-    # set up timezone. Pick timezone from 
+    
+    #import PIconnect
+    
+    # set up timezone. Pick timezone from
     # https://gist.github.com/heyalexej/8bf688fd67d7199be4a1682b3eec7568
     PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
 
@@ -32,7 +32,7 @@ Tutorial
     dataservers = list(PIconnect.PIServer.servers.keys())
     print(dataservers)
 
-    # List of available PI AF servers with databases
+    # List of available PI AF servers, which are not empty
     # AF servers are used for accessing Event and Asset objects
     afservers = [
         servName
@@ -47,14 +47,21 @@ Tutorial
     )
     print(afdatabases)
 
-    # Initiate connection to PI data server & PI AF database of interest by
-    # defining their name
+    # Find AF server that contains custom "NuGreen" database
+    # See instructions above on how to set up the "NuGreen" database for testing purposes
+    afserver = [
+        servName
+        for servName in PIconnect.PIAFDatabase.servers
+        if "NuGreen" in PIconnect.PIAFDatabase.servers[servName]["databases"].keys()
+    ][0]
+
+    # Initiate connection to default PI data server & "NuGreen" PI AF database
     with PIconnect.PIAFDatabase(
-        server=afservers[0], database=afdatabases[0]
+        server=afserver, database="NuGreen"
     ) as afdatabase, PIconnect.PIServer(server=dataservers[0]) as server:
 
         # print name of specified server
-        print(server.server_name)
+        print(server.name)
 
         # print server and database name for specified AF database
         print(f"{afdatabase.server_name}\\{afdatabase.database_name}")
@@ -73,14 +80,14 @@ The following tutorial elaborates on the Asset class and some of its key attribu
     from datetime import datetime
 
     # Returns list of Assets that meets the query criteria
-    # Here a query is executed for an Asset with name '091_R022'
+    # Here a query is executed for an Asset with name 'P-560'
     # For more info on how to construct queries, see further
-    assetlist = afdatabase.find_assets(query="091_R022")
+    assetlist = afdatabase.find_assets(query="P-560")
 
     # Use '*' as a joker sign
-    assetlist = afdatabase.find_assets(query="*R022")
+    assetlist = afdatabase.find_assets(query="P*560")
 
-    # Select the Asset from the Asset list
+    # Select the first Asset from the Asset list
     asset = assetlist[0]
 
     # Some Asset class attributes
@@ -88,17 +95,19 @@ The following tutorial elaborates on the Asset class and some of its key attribu
     print(asset.parent.name)
 
     # Get EventList of Events on this Asset that meet the query criteria
-    # Here a query is executed for Events with template name 'Phase' within
+    # Here a query is executed for Events with template name 'Operation_template' within
     # the defined timeframe
-    events = asset.get_events(start_time="*-50d", end_time="*")
+    events = asset.get_events(starttime="*-10000d", endtime="*")
     events = asset.get_events(
-        start_time="*-50d", end_time="*", template_name="Phase"
+        starttime="1/1/2022 14:00", endtime="10/10/2022 18:00", template_name="Operation_template"
     )
+
     # Using datetime to avoid US vs. EU date confusion
-    start_date = datetime(day=1, month=3, year=2022)
-    end_date = datetime(day=31, month=3, year=2022)
+    # Now specify both event name and event template within defined timeframe
+    start_date = datetime(day=1, month=10, year=2022)
+    end_date = datetime(day=10, month=10, year=2022)
     events = asset.get_events(
-        start_time=start_date, end_time=end_date, template_name="Phase"
+        query="Operation A", starttime=start_date, endtime=end_date, template_name="Operation_template"
     )
 
 
@@ -109,22 +118,27 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
 
 .. code-block:: python
     
-    # Return full Asset Framework up to specified hierachy depth
-    afhierarchy = afdatabase.all_assets(depth=10)
+    # Returns list of Assets that meets the query criteria
+    # Here a query is executed for an Asset location with name 'Equipment'
+    assetlist = afdatabase.find_assets(query="Equipment")
     
+    # get AssetHierarchy from assetlist from current location, up to 2 levels deep
+    # Use assetlist[0].top_asset to find top level asset location
+    assethierarchy = assetlist.get_asset_hierarchy(depth=2)
+
     # Make afhierarchy visible in variable explorer
     # (string & float representation)
-    viewable = PIconnect.PI.view(afhierarchy.df)
+    viewable = PIconnect.PI.view(assethierarchy)
     
     # For accessing AssetHierarchy methods, use accessor("ahy") -----
-    
     # Condense the AssetHierarchy object to return a condensed, vertically layered
     # representation of the Asset Tree
-    afhierarchy_condensed = afhierarchy.condense()
+    assethierarchy_condensed = assethierarchy.ahy.condense()
     
     # Make condensed afhierarchy visible in variable explorer
     # (string & float representation)
-    viewable2 = PIconnect.PI.view(afhierarchy_condensed)
+    viewable2 = PIconnect.PI.view(assethierarchy_condensed)
+
 
 4. Event
 *******************************************************
@@ -135,22 +149,21 @@ An event frame encapsulates the time period of the event and links it to assets 
 .. code-block:: python
     
     # Returns EventList with Events that meets the query criteria
-    # Here a query is executed over the whole Event Hierarchy for an Event that
-    # contains the string 'UP_HR102164G401_R1'
+    # Here a query is executed over the whole Event Hierarchy for Events that
+    # contain the string 'Operation A'
     eventlist = afdatabase.find_events(
-        query="*UP_HR102164G401_R1*", start_time="*-70d", end_time="*-10d"
+        query="Operation A", starttime="1/1/2022", endtime="*"
     )
     
-    # Here a query is executed over the whole Event Hierarchy for an Event that
-    # has template name 'Phase'.
+    # Here a query is executed over the whole Event Hierarchy for Events that
+    # have template name 'Phase'.
     # Using datetime to avoid US vs. EU date confusion
     start_date = datetime(day=1, month=3, year=2022)
-    end_date = datetime(day=31, month=3, year=2022)
+    end_date = datetime(day=31, month=10, year=2022)
     eventlist = afdatabase.find_events(
-        template_name="Phase", start_time=start_date, end_time=end_date
+        template_name="Operation_template", starttime=start_date, endtime=end_date
     )
 
-    
     # Select an Event from the EventList 
     event =  eventlist[0]
     
@@ -163,30 +176,30 @@ An event frame encapsulates the time period of the event and links it to assets 
     print(event.attributes)
     print(event.ref_elements)
 
-    # some Event class methods
+    # Some Event class methods
     # Return Dataframe of interpolated values for tags specified by list of
-    # tagnames (100_091_R014_TT04A) or Tags, for a defined interval within
+    # tagnames ["SINUSOID"] or Tags, for a defined interval within
     # the event
     interpol_values = event.interpolated_values(
-        tag_list=["100_091_R014_TT04A"], interval="1m", dataserver=server
+        tag_list=["SINUSOID"], interval="1m", dataserver=server
     )
+    
     # Optionally, specify a filter condition
     interpol_values = event.interpolated_values(
-        tag_list=["100_091_R014_TT04A"],
+        tag_list=["SINUSOID"],
         interval="1m",
-        filter_expression="'100_091_R019_TT04A' > 20",
+        filter_expression="'SINUSOID' > 40",
         dataserver=server,
     )
     
     # Return Dataframe of recorded values for tags specified by list of tagnames
-    # (100_091_R014_TT04A) or Tags, within the event
+    # (SINUSOID) or Tags, within the event
     recorded_values = event.recorded_values(
-        tag_list=["100_091_R014_TT04A"], dataserver=server
+        tag_list=["SINUSOID"], dataserver=server
     )
-
-    
+ 
     # Return specified summary measure(s) for tags specified by list of tagnames
-    # (100_091_R014_TT04A) or Tags within the event.
+    # (SINUSOID) or Tags within the event.
 
     """summary_types (int): integers separated by '|'. List given
         below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
@@ -215,10 +228,9 @@ An event frame encapsulates the time period of the event and links it to assets 
         - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
             summary types for non-numeric data"""
     summary_values = event.summary(
-        tag_list=["100_091_R014_TT04A"], summary_types=4 | 8, dataserver=server
+        tag_list=["SINUSOID"], summary_types=4 | 8, dataserver=server
     )
 
-    
     # Make summary dataframe visible in variable explorer
     # (string & float representation)
     viewable = PIconnect.PI.view(summary_values)
@@ -226,10 +238,12 @@ An event frame encapsulates the time period of the event and links it to assets 
     # Return values voor specified attribute(s), if no arguments: returns all
     print(event.get_attribute_values())
 
+
 5. EventList
 *******************************************************
 
 The EventList class provides a list-like object that contains Event objects. 
+
 
 6. EventHierarchy
 *******************************************************
@@ -240,15 +254,13 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
 
     # Returns EventList object that meets the query criteria
     # Here a query is executed over the whole Event Hierarchy for an Event that
-    # contains the string 'R' in the past 10 days
+    # contains the string 'Batch' within the specified time window 
     eventlist = afdatabase.find_events(
-        query="*R*", start_time="*-10d", end_time="*"
+        query="*Batch*", starttime="1-9-2022", endtime="1-11-2022"
     )
 
-    # Return event hierarchy down to the depth specified, starting from the
-    # Event(s) specified.
-
-    # starting from EventList
+    # Return event hierarchy down to the hierarchy depth specified, 
+    # starting from the EventList
     eventhierarchy = eventlist.get_event_hierarchy(depth=2)
 
     # Starting from Event
@@ -257,17 +269,17 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
     # For accessing EventHierarchy methods, use accessor("ehy") -----
 
     # Add attribute values to EventHierarchy for specified attributes, defined for
-    # the specified template. Here values are added for the attribute 'B_PH_INFO',
-    # defined for the Phase template
+    # the specified template. Here values are added for the attribute 'Manufacturer',
+    # as defined for the 'Unit_template' template
     eventhierarchy = eventhierarchy.ehy.add_attributes(
-        attribute_names_list=["B_PH_INFO"], template_name="Phase"
+        attribute_names_list=["Manufacturer"], template_name="Unit_template"
     )
 
-    # Add referenced elements to EventHierarchy for specified event template/level
+    # Add referenced elements to EventHierarchy for specified event template
     # Here referenced elements are added that are defined for the the
-    # UnitProcedure template
+    # 'Unit_template' template
     eventhierarchy = eventhierarchy.ehy.add_ref_elements(
-        template_name="UnitProcedure"
+        template_name="Unit_template"
     )
 
     # Make EventHierarchy dataframe visible in variable explorer
@@ -277,26 +289,29 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
     # Return dataframe of interpolated data for discrete events of EventHierarchy
     # Set 'col' argument to 'False' to specify a list of tags
     interpolated_values = eventhierarchy.ehy.interpol_discrete_extract(
-        tag_list=["100_091_R019_TT04A", "100_091_R019_ST01"],
+        tag_list=["SINUSOID", "SINUSOIDU"],
         interval="1h",
         dataserver=server,
         col=False,
     )
 
     # Set 'col' argument to 'True' to have the ability to specify a column that
-    # contains tag per event
+    # can contains tag per event
+    eventhierarchy["tags"] = "SINUSOID" 
+    eventhierarchy["tags"].iloc[0] = "SINUSOIDU"
+
     interpolated_values = eventhierarchy.ehy.interpol_discrete_extract(
-        tag_list=["column_name"], interval="1h", dataserver=server, col=True
+        tag_list=["tags"], interval="1h", dataserver=server, col=True
     )
 
     # Return dataframe of summary data for discrete events of EventHierarchy
     summary_values = eventhierarchy.ehy.summary_extract(
-        tag_list=["100_091_R019_TT04A", "100_091_R019_ST01"],
+        tag_list=["SINUSOID", "SINUSOIDU"],
         summary_types=4 | 8 | 32,
         dataserver=server,
         col=False,
     )
-
+    
     
 7. CondensedEventHierarchy
 *******************************************************
@@ -307,69 +322,67 @@ The CondensedEventHierarchy object provides a dataframe-like representation of t
     
     # Returns EventList object that meets the query criteria
     eventlist = afdatabase.find_events(
-        query="*UP_HR102164G401_R1*", start_time="*-70d", end_time="*-10d"
+        query="*Batch*", starttime="1-9-2022", endtime="1-11-2022"
     )
 
     # Return event hierarchy down to the depth specified, starting from the
     # Event(s) specified.
     eventhierarchy = eventlist.get_event_hierarchy(depth=2)
 
-    # Add attribute values to EventHierarchy for specified attributes,
-    # defined for the specified template
+    # Add attribute values to EventHierarchy for specified attributes, defined for
+    # the specified template. Here values are added for the attribute 'Manufacturer',
+    # as defined for the 'Unit_template' template
     eventhierarchy = eventhierarchy.ehy.add_attributes(
-        ["B_PH_INFO"], template_name="Phase"
+        attribute_names_list=["Manufacturer"], template_name="Unit_template"
     )
 
-    # Add referenced elements to EventHierarchy for specified event
-    # template/level
+    # Add referenced elements to EventHierarchy for specified event template
+    # Here referenced elements are added that are defined for the the
+    # 'Unit_template' template
     eventhierarchy = eventhierarchy.ehy.add_ref_elements(
-        template_name="UnitProcedure"
+        template_name="Unit_template"
     )
 
     # Condense the EventHierarchy object to return a condensed, vertically
     # layered representation of the Event Tree
-    condensed = eventhierarchy.condense()
+    condensed = eventhierarchy.ehy.condense()
 
     # Use Pandas dataframe methods to filter out events of interest
-    df_cond = condensed[
-        (condensed["B_PH_INFO [Phase]"] >= 30010)
-        & (condensed["B_PH_INFO [Phase]"] <= 30020)
-    ]
+    # In this case, only select events on equipment "P-560"
+    df_cond = condensed[(condensed["Referenced_el [Unit_template](0)"] == "P-560")]
 
     # For accessing EventHierarchy methods, use accessor("ecd") -----
-
     # Return dataframe of interpolated values for discrete events on bottom level
-    # of condensed hierarchy
+    # of the condensed hierarchy
     disc_interpol_values = df_cond.ecd.interpol_discrete_extract(
-        tag_list=["100_091_R014_TT04A", "100_091_R014_ST01"],
-        interval="1m",
+        tag_list=["SINUSOID", "SINUSOIDU"],
+        interval="1h",
         dataserver=server,
     )
 
     # Return dataframe of continous, interpolated values from the start of the
     # first filtered event to the end of the last filtered event for each
-    # procedure on bottom level of condensed hierarchy
+    # subsequent event on bottom level of the condensed hierarchy, by top-level event
     cont_interpol_values = df_cond.ecd.interpol_continuous_extract(
-        tag_list=["100_091_R014_TT04A", "100_091_R014_ST01"],
-        interval="1m",
+        tag_list=["SINUSOID", "SINUSOIDU"],
+        interval="1h",
         dataserver=server,
     )
 
     # Return nested dictionary (level 1: Procedures, Level 2: Tags) of recorded
     # values from the start of the first filtered event to the end of the last 
-    # filtered event for each procedure on bottom level of condensed hierarchy
+    # filtered event for each subsequent event on the bottom level of the condensed hierarchy, by top-level event
     recorded_values = df_cond.ecd.recorded_extract(
-        tag_list=["100_091_R014_TT04A", "100_091_R014_ST01"], dataserver=server
+        tag_list=["SINUSOID", "SINUSOIDU"], dataserver=server
     )
 
     # Return dataframe of summary data for events on bottom level of condensed
     # hierarchy
     summary_values = df_cond.ecd.summary_extract(
-        tag_list=["100_091_R014_TT04A", "100_091_R014_ST01"],
+        tag_list=["SINUSOID", "SINUSOIDU"],
         summary_types=2 | 4 | 8,
         dataserver=server,
     )
-
    
 
 8. Tag
@@ -381,18 +394,18 @@ For example, a Tag might store the flow rate from a meter, a controller's mode o
 
 .. code-block:: python
     
-    # Returns comprhenesive overview of tags that meet the query criteria
-    # Quite slow and meant for tag exploration, for efficiently querying tags the
-    # 'find_tags' method (cfr. infra) is preferred.
-    tag_overview = server.tag_overview("*091_R019*")
+        # Returns comprehensive overview of tags that meet the query criteria
+    # Quite slow and meant for tag exploration, for efficiently querying tags
+    # the 'find_tags' method (cfr. infra) is preferred.
+    tag_overview = server.tag_overview("SINUSOID*")
 
     # Make EventHierarchy dataframe visible in variable explorer
     # (string & float representation)
     viewable = PIconnect.PI.view(tag_overview)
 
     # Returns TagList with tags that meet the query criteria
-    # Here a query is executed to find tag '100_091_R019_TT04A'
-    taglist = server.find_tags("*091_R019_TT04A")
+    # Here a query is executed to find tag 'SINUSOID'
+    taglist = server.find_tags("SINUSOID")
 
     # Select an Tag from the TagList
     tag = taglist[0]
@@ -410,22 +423,25 @@ For example, a Tag might store the flow rate from a meter, a controller's mode o
     current_value = tag.current_value()
     print(
         f"The value of {tag.name} ({tag.description}) at {tag.last_update}"
-        + f" is {current_value}{tag.uom}"
+        + f" is {current_value[1]}{tag.uom}"
     )
 
     # Return interpolated values at the specified interval for Tag, between
     # starttime and endtime
     interpol_values = tag.interpolated_values(
-        starttime="*-20d", endtime="*-10d", interval="1m"
+        starttime="*-20d", endtime="*-10d", interval="1h"
     )
 
     # Return recorded values for Tag, between starttime and endtime
     recorded_values = tag.recorded_values(starttime="*-5d", endtime="*-2d")
-    # Optionally, specify a filter condition:'%tag%' refers back to Tag name
+
+    # Optionally, specify a filter condition
+    # '%tag%' refers back to Tag name, and can be used for an individual tag
+    #  When working with multiple tags, specificy full tag name
     recorded_values = tag.recorded_values(
-        starttime="18/08/2021",
-        endtime="19/08/2021",
-        filter_expression="'%tag%' > 20",
+        starttime="18/08/2022",
+        endtime="19/08/2022",
+        filter_expression="'%tag%' > 30",
     )
 
     # Retrieves values over the specified time range suitable for plotting over
@@ -457,7 +473,7 @@ For example, a Tag might store the flow rate from a meter, a controller's mode o
         endtime="*-10d",
         interval="1d",
         summary_types=2 | 4 | 8,
-        filter_expression="'100_091_R019_TT04A' > 20",
+        filter_expression="'SINUSOID' > 30",
     )
 
 
@@ -471,7 +487,7 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
 .. code-block:: python
 
     # Returns TagList with tags that meet the query criteria
-    taglist = server.find_tags("*091_R019_TT0*")
+    taglist = server.find_tags("*SINUSOID*")
 
     # Return the last recorded value for a Tag
     current_value = taglist.current_value()
@@ -479,16 +495,16 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
     # Return interpolated values at the specified interval for Tag, between
     # starttime and endtime
     interpol_values = taglist.interpolated_values(
-        starttime="*-20d", endtime="*-10d", interval="1m"
+        starttime="*-20d", endtime="*-10d", interval="1h"
     )
 
     # Return recorded values for Tag, between starttime and endtime
     recorded_values = taglist.recorded_values(starttime="*-5d", endtime="*-2d")
     # Optionally, specify a filter condition
     recorded_values = taglist.recorded_values(
-        starttime="18/08/2021",
-        endtime="19/08/2021",
-        filter_expression="'100_091_R019_TT01A' > 20",
+        starttime="18/08/2022",
+        endtime="19/08/2022",
+        filter_expression="'SINUSOID' > 30",
     )
 
     # Retrieves values over the specified time range suitable for plotting over
@@ -520,11 +536,47 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
         endtime="*-10d",
         interval="1d",
         summary_types=2 | 4 | 8,
-        filter_expression="'100_091_R019_TT04A' > 20",
+        filter_expression="'SINUSOID' > 30",
     )
 
 
-10. Attribute & Method Overview
+10. Attribute
+*******************************************************
+
+The Attribute class provide an easy way to capture attribute data.
+The Attribute represents a single value that is used to represent a specific piece of information that is part of an Asset or an Event.
+
+.. code-block:: python
+    
+    # Returns list of Assets that meets the query criteria
+    # Here a query is executed for an Asset with name 'P-560'
+    assetlist = afdatabase.find_assets(query="P-560")
+
+    # Select the first Asset from the Asset list
+    asset = assetlist[0]
+
+    # select first attribute for this asset
+    attribute = asset.attributes[0]
+
+    print(attribute.source_type)
+    print(attribute.path)
+    print(attribute.description)
+    print(attribute.current_value())
+
+    # select first asset attribute that has a Tag/PIpoint as a source
+    attribute = [
+        attribute 
+        for attribute in asset.attributes
+        if attribute.source_type == 'PI Point'][0]
+
+    print(attribute.source_type)
+    print(attribute.path)
+    print(attribute.description)
+    print(attribute.pipoint)
+    print(attribute.current_value())
+
+
+11. Attribute & Method Overview
 *******************************************************
 
 .. csv-table:: PIServer
@@ -533,7 +585,7 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
 
    "**.servers**", "*Attribute*", "Return dictionary of type {servername: <OSIsoft.AF.PI.PIServer object>}"
    "**.default_server**", "*Attribute*", "Return <OSIsoft.AF.PI.PIServer object>"
-   "**.server_name**", "*Attribute*", "Return name of connected server"
+   "**.name**", "*Attribute*", "Return name of connected server"
    "**.find_tags**
    (query, source=None)", "*Method*", "Return list of Tag objects as a result of the query"
    "**.tag_overview**
@@ -729,7 +781,7 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
    ()", "*Method*", "Condense the AssetHierarchy object to return a condensed, vertically layered representation of the Asset Tree"
 
 
-11. PIConstants
+12. PIConstants
 *******************************************************
 PIConstants provides a defined set of arguments that can be passed to some of the class methods specified above to modify their behaviour. 
 They are imported from the PIConsts module and used as illustrated in the example below. 
