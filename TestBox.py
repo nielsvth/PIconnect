@@ -127,3 +127,13 @@ with PIconnect.PIAFDatabase(
     )
 
     print(y)
+
+    with PIconnect.PIAFDatabase(
+        server="ITSBEBEWSP06182 DEV", database="NuGreen"
+    ) as afdatabase, PIconnect.PIServer() as server:
+
+        assetlist = afdatabase.find_assets(query="Equipment")
+
+        asset = assetlist[0].children[0]
+        x = asset.attributes
+        y = asset.get_attribute_values()

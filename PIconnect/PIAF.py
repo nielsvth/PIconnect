@@ -101,8 +101,15 @@ class EventList(UserList):
         """Return eventlist as set"""
         return set(self.data)
 
-    def get_event_hierarchy(self, depth=10) -> pd.DataFrame:
-        """Return EventHierarchy down to the specified depth"""
+    def get_event_hierarchy(self, depth: int = 10) -> pd.DataFrame:
+        """Return EventHierarchy down to the specified depth
+
+        Args:
+            depth (int, optional): depth to return to. Defaults to 10.
+
+        Returns:
+            pd.DataFrame: Dataframe of event hierarchy.
+        """
         # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_AFNamedCollectionList_1.htm
         afcontainer = AF.AFNamedCollectionList[
             AF.EventFrame.AFEventFrame
@@ -168,16 +175,6 @@ class EventList(UserList):
             df_events["Endtime"] = df_events["Event"].apply(
                 lambda x: x.endtime if x else np.nan
             )
-
-            print(
-                "This Event Hierarchy has structure of "
-                + '"\\\\Server\\Database\\{}"'.format(
-                    "\\".join(
-                        [str(ev) for ev in df_events["Template"].unique()]
-                    )
-                )
-            )  # not completely correct if different templates on a single
-            # level
 
         return df_events
 
@@ -343,7 +340,7 @@ class Asset:
 
     @property
     def attributes(self):
-        """'Return list of attribute names for Asset"""
+        """'Return list of attributes for Asset"""
         return [Attribute(attribute) for attribute in self.asset.Attributes]
 
     @property
@@ -371,6 +368,11 @@ class Asset:
     def description(self):
         """Return description for Asset"""
         return self.asset.Description
+
+    @property
+    def top_asset(self):
+        """Return top-level Asset name"""
+        return self.path.strip("\\").split("\\")[2]
 
     # methods
     def get_attribute_values(
@@ -456,6 +458,150 @@ class Asset:
             sortField,
             sortOrder,
         )
+
+    def get_asset_hierarchy(self, depth: int = 10) -> pd.DataFrame:
+        """Return AssetHierarchy down to the specified depth
+
+        Args:
+            depth (int, optional): depth to return to. Defaults to 10.
+
+        Returns:
+            AssetHierarchy: AssetHierarchy
+        """
+
+        afcontainer = AF.AFNamedCollectionList[
+            AF.Asset.AFElement
+        ]()  # empty container
+        afcontainer.Add(self.asset)
+
+        df_assets = pd.DataFrame(
+            columns=["Asset", "Path", "Name", "Template", "Level"]
+        )
+
+        if len(afcontainer) > 0:
+            df_roots = pd.DataFrame(
+                [(y, y.GetPath()) for y in afcontainer],
+                columns=["Asset", "Path"],
+            )
+
+            print(
+                "Fetching hierarchy data for {} Assets(s)...".format(
+                    len(afcontainer)
+                )
+            )
+            # https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_Asset_AFElement_LoadElementsToDepth.htm  # noqa
+            asset_depth = AF.Asset.AFElement.LoadElementsToDepth(
+                afcontainer, False, depth, 1000000
+            )
+
+            if len(asset_depth) > 0:
+                df_assets = pd.DataFrame(
+                    [(y, y.GetPath()) for y in asset_depth],
+                    columns=["Asset", "Path"],
+                )
+
+            # concatenate procedures and child assets
+            df_assets = pd.concat([df_roots, df_assets], ignore_index=True)
+
+            df_assets["Asset"] = df_assets["Asset"].apply(lambda x: Asset(x))
+            df_assets["Name"] = df_assets["Asset"].apply(
+                lambda x: x.name if x else np.nan
+            )
+            df_assets["Template"] = df_assets["Asset"].apply(
+                lambda x: x.template_name if x else np.nan
+            )
+            df_assets["Level"] = (
+                df_assets["Path"].str.count(r"\\").apply(lambda x: x - 4)
+            )
+            # print('This Asset Frame has structure of "\\\\Server\\Database\\
+            # {}"'.format('\\'.join([str(el) for el in df_assets['Template']
+            # .unique()])))
+            return df_assets
+        else:
+            return pd.DataFrame(
+                columns=["Asset", "Path", "Name", "Template", "Level"]
+            )
+
+
+class AssetList(UserList):
+    """Container for AssetList object"""
+
+    def __init__(self, data):
+        self.data = data  # list of Assets
+        # validation step ---
+
+    def __repr__(self):
+        return str([asset for asset in self.data])
+
+    def __str__(self):
+        return str([asset for asset in self.data])
+
+    def get_asset_hierarchy(self, depth: int = 10) -> pd.DataFrame:
+        """Return AssetHierarchy down to the specified depth
+
+        Args:
+            depth (int, optional): depth to return to. Defaults to 10..
+
+        Returns:
+            pd.DataFrame: Dataframe of asset hierarchy.
+        """
+        afcontainer = AF.AFNamedCollectionList[
+            AF.Asset.AFElement
+        ]()  # empty container
+
+        for asset in self.data:
+            try:
+                afcontainer.Add(asset.af_asset)
+            except:
+                raise ("Failed to process event {}".format(event))
+
+        df_assets = pd.DataFrame(
+            columns=["Asset", "Path", "Name", "Template", "Level"]
+        )
+
+        if len(afcontainer) > 0:
+            df_roots = pd.DataFrame(
+                [(y, y.GetPath()) for y in afcontainer],
+                columns=["Asset", "Path"],
+            )
+
+            print(
+                "Fetching hierarchy data for {} Assets(s)...".format(
+                    len(afcontainer)
+                )
+            )
+            # https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_Asset_AFElement_LoadElementsToDepth.htm  # noqa
+            asset_depth = AF.Asset.AFElement.LoadElementsToDepth(
+                afcontainer, False, depth, 1000000
+            )
+
+            if len(asset_depth) > 0:
+                df_assets = pd.DataFrame(
+                    [(y, y.GetPath()) for y in asset_depth],
+                    columns=["Asset", "Path"],
+                )
+
+            # concatenate procedures and child assets
+            df_assets = pd.concat([df_roots, df_assets], ignore_index=True)
+
+            df_assets["Asset"] = df_assets["Asset"].apply(lambda x: Asset(x))
+            df_assets["Name"] = df_assets["Asset"].apply(
+                lambda x: x.name if x else np.nan
+            )
+            df_assets["Template"] = df_assets["Asset"].apply(
+                lambda x: x.template_name if x else np.nan
+            )
+            df_assets["Level"] = (
+                df_assets["Path"].str.count(r"\\").apply(lambda x: x - 4)
+            )
+            # print('This Asset Frame has structure of "\\\\Server\\Database\\
+            # {}"'.format('\\'.join([str(el) for el in df_assets['Template']
+            # .unique()])))
+            return df_assets
+        else:
+            return pd.DataFrame(
+                columns=["Asset", "Path", "Name", "Template", "Level"]
+            )
 
 
 try:
@@ -543,7 +689,7 @@ class AssetHierarchy:
                     df_level["Path"].str.split("\\", expand=True).loc[:, 4:]
                 )
                 # remove Path columns
-                df_level.drop(["Path"], 1, inplace=True)
+                df_level.drop(columns=["Path"], axis=1, inplace=True)
                 # rename columns, ignore columns with number names
                 df_level.columns = [
                     col_name + " [" + str(int(level)) + "]"
@@ -564,12 +710,12 @@ class AssetHierarchy:
                     )
         # drop auxiliary columns
         df_condensed.drop(
-            [
+            columns=[
                 col_name
                 for col_name in df_condensed.columns
                 if type(col_name) == int
             ],
-            1,
+            axis=1,
             inplace=True,
         )
         # remove duplicates
@@ -839,79 +985,7 @@ class PIAFDatabase(object):
             sortOrder,
             max_count,
         )
-        return [Asset(x) for x in lst]
-
-    def all_assets(
-        self, af_asset_list: List[Asset] = [], depth: int = 10
-    ) -> AssetHierarchy:
-        """Get AssetHierarchy for a list
-
-        Args:
-            af_asset_list (List[Asset], optional): list of Assets.
-                Defaults to [].
-            depth (int, optional): depth to make. Defaults to 10.
-
-        Returns:
-            AssetHierarchy: AssetHierarchy
-        """
-
-        # "**.get_asset_hierarchy(af_asset_list=[], depth=10)**", "*Method*"
-        # , "Return AssetHierarchy object for specified Assets"
-        # ----------------------------------------- > make part of asset class
-
-        # None of these
-        # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFElement.htm # noqa
-        # FindElements methods works
-        # use AFDatabase.children to select starting element(s) of interest
-        # elements = self.database.Elements
-
-        if af_asset_list == []:
-            af_asset_list = self.children.values()
-
-        clist = C_List[AF.Asset.AFElement]()  # create generic list
-        for af_asset in af_asset_list:
-            clist.Add(af_asset)
-        df_roots = pd.DataFrame(
-            [(Asset(y), y.GetPath()) for y in clist], columns=["Asset", "Path"]
-        )
-
-        if len(clist) > 0:
-            print("Fetching AF Asset element data")
-            # https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_Asset_AFElement_LoadElementsToDepth.htm  # noqa
-            asset_depth = AF.Asset.AFElement.LoadElementsToDepth(
-                clist, False, depth, 1000000
-            )
-
-            if len(asset_depth) > 0:
-                df_assets = pd.DataFrame(
-                    [(Asset(y), y.GetPath()) for y in asset_depth],
-                    columns=["Asset", "Path"],
-                )
-            else:
-                df_assets = pd.DataFrame()
-
-            # concatenate procedures and child event frames
-            df_assets = pd.concat([df_roots, df_assets], ignore_index=True)
-
-            df_assets["Name"] = df_assets["Asset"].apply(
-                lambda x: x.name if x else np.nan
-            )
-            df_assets["Template"] = df_assets["Asset"].apply(
-                lambda x: x.template_name if x else np.nan
-            )
-            df_assets["Level"] = (
-                df_assets["Path"].str.count(r"\\").apply(lambda x: x - 4)
-            )
-            # print('This Asset Frame has structure of "\\\\Server\\Database\\
-            # {}"'.format('\\'.join([str(el) for el in df_assets['Template']
-            # .unique()])))
-            return AssetHierarchy(df_assets)
-        else:
-            return AssetHierarchy(
-                pd.DataFrame(
-                    columns=["Asset", "Path", "Name", "Template", "Level"]
-                )
-            )
+        return AssetList([Asset(x) for x in lst])
 
 
 class Event:
@@ -1403,13 +1477,6 @@ class Event:
         df_events["Endtime"] = df_events["Event"].apply(
             lambda x: x.endtime if x else np.nan
         )
-
-        print(
-            "This Event Hierarchy has structure of "
-            + '"\\\\Server\\Database\\{}"'.format(
-                "\\".join([str(ev) for ev in df_events["Template"].unique()])
-            )
-        )  # not really correct when different templates on a level
 
         return df_events
 
@@ -2007,6 +2074,15 @@ class CondensedEventHierarchy:
         """
         taglist = convert_to_TagList(tag_list, dataserver)
 
+        # select events on bottem level of condensed hierarchy
+        col_start = [
+            col_name
+            for col_name in self.df.columns
+            if col_name.startswith("Starttime")
+        ][-1]
+        # sort chronologically by starttime
+        self.df.sort_values(by=[col_start], ascending=True, inplace=True)
+
         print("building continuous extract table from condensed hierachy...")
         # select events on bottem level of condensed hierarchy
         col_event = [
@@ -2099,6 +2175,15 @@ class CondensedEventHierarchy:
         """
         taglist = convert_to_TagList(tag_list, dataserver)
 
+        # select events on bottem level of condensed hierarchy
+        col_start = [
+            col_name
+            for col_name in self.df.columns
+            if col_name.startswith("Starttime")
+        ][-1]
+        # sort chronologically by starttime
+        self.df.sort_values(by=[col_start], ascending=True, inplace=True)
+
         print("building recorded extract dict from condensed hierachy...")
         # select events on bottem level of condensed hierarchy
         col_event = [
@@ -2170,6 +2255,15 @@ class CondensedEventHierarchy:
                 ProcedureName: {tagName: tagData}
         """
         taglist = convert_to_TagList(tag_list, dataserver)
+
+        # select events on bottem level of condensed hierarchy
+        col_start = [
+            col_name
+            for col_name in self.df.columns
+            if col_name.startswith("Starttime")
+        ][-1]
+        # sort chronologically by starttime
+        self.df.sort_values(by=[col_start], ascending=True, inplace=True)
 
         print(
             "building continuous plot extract dict from condensed hierachy..."
