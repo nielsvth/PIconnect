@@ -5,8 +5,8 @@ PIconnect
 A Python connector to the OSISoft PI AF SDK
 ========================================================
 
-nielsvth/PIconnect provides a programmatic interface in Python to the OSISoft PI AF SDK. 
-This branch expands upon the Hugovdberg/PIconnect package to include additional functionality for working with Assets, Attributes and (hierarchical) EventFrames.
+'nielsvth/PIconnect' provides a programmatic interface in Python to the OSISoft PI AF SDK. 
+This branch expands upon the 'Hugovdberg/PIconnect' package to include additional functionality for working with Assets, Attributes and (hierarchical) EventFrames.
 It also provides functionality for executing bulk queries and calculations. 
 
 The basic introduction to working with the PIconnect package is covered in the Tutorial below.
@@ -80,14 +80,14 @@ The following tutorial elaborates on the Asset class and some of its key attribu
     from datetime import datetime
 
     # Returns list of Assets that meets the query criteria
-    # Here a query is executed for an Asset with name '091_R022'
+    # Here a query is executed for an Asset with name 'P-560'
     # For more info on how to construct queries, see further
     assetlist = afdatabase.find_assets(query="P-560")
 
     # Use '*' as a joker sign
     assetlist = afdatabase.find_assets(query="P*560")
 
-    # Select the Asset from the Asset list
+    # Select the first Asset from the Asset list
     asset = assetlist[0]
 
     # Some Asset class attributes
@@ -540,7 +540,43 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
     )
 
 
-10. Attribute & Method Overview
+10. Attribute
+*******************************************************
+
+The Attribute class provide an easy way to capture attribute data.
+The Attribute represents a single value that is used to represent a specific piece of information that is part of an Asset or an Event.
+
+.. code-block:: python
+    
+    # Returns list of Assets that meets the query criteria
+    # Here a query is executed for an Asset with name 'P-560'
+    assetlist = afdatabase.find_assets(query="P-560")
+
+    # Select the first Asset from the Asset list
+    asset = assetlist[0]
+
+    # select first attribute for this asset
+    attribute = asset.attributes[0]
+
+    print(attribute.source_type)
+    print(attribute.path)
+    print(attribute.description)
+    print(attribute.current_value())
+
+    # select first asset attribute that has a Tag/PIpoint as a source
+    attribute = [
+        attribute 
+        for attribute in asset.attributes
+        if attribute.source_type == 'PI Point'][0]
+
+    print(attribute.source_type)
+    print(attribute.path)
+    print(attribute.description)
+    print(attribute.pipoint)
+    print(attribute.current_value())
+
+
+11. Attribute & Method Overview
 *******************************************************
 
 .. csv-table:: PIServer
@@ -549,7 +585,7 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
 
    "**.servers**", "*Attribute*", "Return dictionary of type {servername: <OSIsoft.AF.PI.PIServer object>}"
    "**.default_server**", "*Attribute*", "Return <OSIsoft.AF.PI.PIServer object>"
-   "**.server_name**", "*Attribute*", "Return name of connected server"
+   "**.name**", "*Attribute*", "Return name of connected server"
    "**.find_tags**
    (query, source=None)", "*Method*", "Return list of Tag objects as a result of the query"
    "**.tag_overview**
@@ -745,7 +781,7 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
    ()", "*Method*", "Condense the AssetHierarchy object to return a condensed, vertically layered representation of the Asset Tree"
 
 
-11. PIConstants
+12. PIConstants
 *******************************************************
 PIConstants provides a defined set of arguments that can be passed to some of the class methods specified above to modify their behaviour. 
 They are imported from the PIConsts module and used as illustrated in the example below. 
