@@ -29,9 +29,9 @@ To import the NuGreen database, follow these steps:
 
 **PIServer**
 
-In case the default 'SINUSOID' and 'SINUSOIDU' tags do not exist on your PIserver. 
+In case the default 'SINUSOID' and 'SINUSOIDU' tags do not exist on your PIserver: 
 
-- `How do I generate sinusoid/sinusoidu data in Pi Server 2018? <https://pisquare.osisoft.com/s/question/0D51I00004UHjpQSAT/how-do-i-generate-sinusoidsinusoidu-data-in-pi-server-2018>`_.
+- `How do I generate sinusoid/sinusoidu data in Pi Server 2018? <https://pisquare.osisoft.com/s/question/0D51I00004UHjpQSAT/how-do-i-generate-sinusoidsinusoidu-data-in-pi-server-2018>`_
 
 
 .. code-block:: python
@@ -603,7 +603,7 @@ Core functionality for doing advanced calculations and filtering
 
 .. code-block:: python
 
-    #Find 'SINUSOID' tag
+    # find 'SINUSOID' tag
     tag = server.find_tags("SINUSOID")[0]
 
     # calculation on recorded values
