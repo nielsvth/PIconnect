@@ -87,10 +87,10 @@ The following tutorial elaborates on the Asset class and some of its key attribu
     # Use '*' as a joker sign
     assetlist = afdatabase.find_assets(query="P*560")
 
-    # Select the first Asset from the Asset list
+    # Select the first Asset from the AssetList
     asset = assetlist[0]
 
-    # Some Asset class attributes
+    # Some Assetclass attributes
     print(asset.name)
     print(asset.parent.name)
 
@@ -110,11 +110,16 @@ The following tutorial elaborates on the Asset class and some of its key attribu
         query="Operation A", starttime=start_date, endtime=end_date, template_name="Operation_template"
     )
 
-
-3. AssetHierarchy
+3. AssetList
 *******************************************************
 
-The AssetHierarchy objects provides a dataframe-like representation of the hierachical structure of the Asset Tree
+The AssetList class provides a list-like object that contains Asset objects. 
+
+
+4. AssetHierarchy
+*******************************************************
+
+The AssetHierarchy objects provides a dataframe-like representation of the hierachical structure of the List Tree
 
 .. code-block:: python
     
@@ -140,7 +145,7 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
     viewable2 = PIconnect.PI.view(assethierarchy_condensed)
 
 
-4. Event
+5. Event
 *******************************************************
 
 Events provide an easy way to capture process events and related system data.
@@ -239,13 +244,13 @@ An event frame encapsulates the time period of the event and links it to assets 
     print(event.get_attribute_values())
 
 
-5. EventList
+6. EventList
 *******************************************************
 
 The EventList class provides a list-like object that contains Event objects. 
 
 
-6. EventHierarchy
+7. EventHierarchy
 *******************************************************
 
 The AssetHierarchy objects provides a dataframe-like representation of the hierachical structure of the Event Tree
@@ -313,7 +318,7 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
     )
     
     
-7. CondensedEventHierarchy
+8. CondensedEventHierarchy
 *******************************************************
 
 The CondensedEventHierarchy object provides a dataframe-like representation of the condensed, vertically layered representation of the Event Tree.
@@ -385,7 +390,7 @@ The CondensedEventHierarchy object provides a dataframe-like representation of t
     )
    
 
-8. Tag
+9. Tag
 *******************************************************
 
 A Tag refers to a single data stream stored by PI Data Archive and is also known as a PIPoint.  
@@ -477,7 +482,7 @@ For example, a Tag might store the flow rate from a meter, a controller's mode o
     )
 
 
-9. TagList
+10. TagList
 *******************************************************
 
 The TagList class provides a list-like object that contains Tag objects.
@@ -540,11 +545,11 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
     )
 
 
-10. Attribute
+11. Attribute
 *******************************************************
 
 The Attribute class provide an easy way to capture attribute data.
-The Attribute represents a single value that is used to represent a specific piece of information that is part of an Asset or an Event.
+The Attribute represents a single value that is used to represent a specific piece of information that is part of an List or an Event.
 
 .. code-block:: python
     
@@ -552,7 +557,7 @@ The Attribute represents a single value that is used to represent a specific pie
     # Here a query is executed for an Asset with name 'P-560'
     assetlist = afdatabase.find_assets(query="P-560")
 
-    # Select the first Asset from the Asset list
+    # Select the first Asset from the AssetList
     asset = assetlist[0]
 
     # select first attribute for this asset
@@ -576,7 +581,35 @@ The Attribute represents a single value that is used to represent a specific pie
     print(attribute.current_value())
 
 
-11. Attribute & Method Overview
+12. Calculation
+*******************************************************
+
+Core functionality for doing advanced calculations and filtering
+
+.. code-block:: python
+
+        #Find 'SINUSOID' tag
+    tag = server.find_tags("SINUSOID")[0]
+
+    # calculation on recorded values
+    # for overview of expression syntax: https://docs.aveva.com/bundle/pi-server-af-analytics/page/1021946.html
+    calc1 = PIconnect.calc.calc_recorded(
+        "1-10-2022 14:00",
+        "1-10-2022 22:00",
+        r"IF ('\\ITSBEBEPIHISCOL\SINUSOID' > 70) THEN (Abs('\\ITSBEBEPIHISCOL\SINUSOID')) ELSE (0)",
+    )
+
+    # calculation on interpolated values
+    # returns totalized value per minute, do *1440 to get per day
+    calc2 = PIconnect.calc.calc_interpolated(
+        "1-10-2022 14:00",
+        "1-10-2022 14:00",
+        "1h",
+        r"TagTot('\\ITSBEBEPIHISCOL\SINUSOID', '01-Oct-2022 14:00:00', '03-Oct-2022 14:00:00')",
+    )
+
+
+13.  Attribute & Method Overview
 *******************************************************
 
 .. csv-table:: PIServer
@@ -587,17 +620,17 @@ The Attribute represents a single value that is used to represent a specific pie
    "**.default_server**", "*Attribute*", "Return <OSIsoft.AF.PI.PIServer object>"
    "**.name**", "*Attribute*", "Return name of connected server"
    "**.find_tags**
-   (query, source=None)", "*Method*", "Return list of Tag objects as a result of the query"
+   (query, source=None)", "*Method*", "Return TagList object as a result of the query"
    "**.tag_overview**
-   (query)", "*Method*", "Return dataframe containing overview of Tag object, tag name, description and UOM for each tag that meets the restrictions specified in the query"
+   (query)", "*Method*", "Return dataframe containing overview of Tag object, tag name, description and UOM for each tag that meets the query criteria"
    
 .. csv-table:: Tag
    :header: "Atrribute/ Method", "Type", "Description"
    :widths: 30, 15, 50
 
-   "**.name**", "*Attribute*", "Return name of Tag (PIPoint)"
+   "**.name**", "*Attribute*", "Return Tag name"
    "**.pipoint**", "*Attribute*", "Return <OSIsoft.AF.PI.PIPoint object>"
-   "**.server**", "*Attribute*", "Return connected server"
+   "**.server**", "*Attribute*", "Return connected PIServer"
    "**.raw_attributes**", "*Attribute*", "Return dictionary of the raw attributes"
    "**.last_update**", "*Attribute*", "Return datetime at which the last value was recorded"
    "**.uom**", "*Attribute*", "Return units of measument"
@@ -606,7 +639,9 @@ The Attribute represents a single value that is used to represent a specific pie
    "**.pointtype**", "*Attribute*", "Return an integer value corresponding to the pointtype (https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_PI_PIPointType.htm)"
    "**.pointtype_desc**", "*Attribute*", "Return the pointtype"
    "**.current_value**
-   ()", "*Method*", "Return last recorded value"
+   ()", "*Method*", "Return tuple of timestamp and last recorded value"
+   "**.interpolated_value**
+   (timestamp)", "*Method*", "Return tuple of timestamp and interpolated value at specified time"
    "**.interpolated_values**
    (starttime, endtime, interval, filter_expression='')", "*Method*", "Return Dataframe of interpolated values at specified interval for Tag, between starttime and endtime"
    "**.recorded_values**
@@ -617,19 +652,21 @@ The Attribute represents a single value that is used to represent a specific pie
    (starttime, endtime, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return specified summary measure(s) for Tag within the specified timeframe 
         
         Summary_types are defined as integers separated by '|'
-        fe: to extract min and max >> event.summary(['tag_x'], dataserver, 4|8)"
+        fe: to extract min(=4) and max(=8) >> event.summary(['tag_x'], dataserver, 4|8)"
    "**.summaries**
    (starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return one or more summary values for each interval, within a specified timeframe"
    "**filtered_summaries**
-   (starttime, endtime, interval,summary_types, filter_expression, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, filter_interval=None)", "*Method*", "Return one or more summary values for each interval, within a specified timeframe, for values that meet the specified filter condition"
+   (starttime, endtime, interval,summary_types, filter_expression, calculation_basis=CalculationBasis.EVENT_WEIGHTED, time_type=TimestampCalculation.AUTO, AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, filter_interval=None)", "*Method*", "Return one or more summary values for each interval, within a specified timeframe, for values that meet the specified filter condition"
 
 
 .. csv-table:: TagList
    :header: "Atrribute/ Method", "Type", "Description"
    :widths: 30, 15, 50
 
-   "**.current_values**
-   ()", "*Method*", "Return Dataframe of current values per tag"
+   "**.current_value**
+   ()", "*Method*", "Return Dataframe of current value per tag"
+   "**.interpolated_value**
+   (timestamp)", "*Method*", "Return Dataframe of interpolated value per tag at specified timestamp"
    "**.plot_values**
    (starttime, endtime, nr_of_intervals)", "*Method*", "Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels). Returns a Dictionary of DataFrames for Tags in Taglist with values that will produce the most accurate plot over the time range while minimizing the amount of data returned"
    "**.interpolated_values**
@@ -644,7 +681,7 @@ The Attribute represents a single value that is used to represent a specific pie
    "**.summaries**
    (starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return one or more summary values for Tags in Taglist, for each interval within a time range"
    "**filtered_summaries**
-   (self, starttime, endtime, interval,summary_types, filter_expression, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, filter_interval=None)", "*Method*", "Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet the filter criteria"
+   (self, starttime, endtime, interval,summary_types, filter_expression, calculation_basis=CalculationBasis.EVENT_WEIGHTED, time_type=TimestampCalculation.AUTO, AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, filter_interval=None)", "*Method*", "Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet the filter criteria"
 
 
 .. csv-table:: PIAFDatabase
@@ -659,9 +696,9 @@ The Attribute represents a single value that is used to represent a specific pie
    "**.descendant**
    (path)", "*Method*", "Return a descendant of the database from an exact path"
    "**.find_events**
-   (query=None, asset='*', start_time=None, end_time='*', template_name = None, start_index=0, max_count=1000000, search_mode=SearchMode.OVERLAPPED, search_full_hierarchy=True, sortField=SortField.STARTTIME, sortOrder=SortOrder.ASCENDING)", "*Method*", "Return a EventList of Events that meet query criteria"
+   (query=None, asset='*', start_time=None, end_time='*', template_name = None, start_index=0, max_count=1000000, search_mode=SearchMode.OVERLAPPED, search_full_hierarchy=True, sortField=SortField.STARTTIME, sortOrder=SortOrder.ASCENDING)", "*Method*", "Return an EventList that meets query criteria"
    "**.find_assets**
-   (query=None, top_asset=None, searchField=SearchField.NAME, search_full_hierarchy=True, sortField=SortField.STARTTIME, sortOrder=SortOrder.ASCENDING, max_count=10000000)", "*Method*", "Return list of Assets that meet query criteria"
+   (query=None, top_asset=None, searchField=SearchField.NAME, search_full_hierarchy=True, sortField=SortField.STARTTIME, sortOrder=SortOrder.ASCENDING, max_count=10000000)", "*Method*", "Return an AssetList that meets query criteria"
    
    
 .. csv-table:: Event
@@ -679,7 +716,7 @@ The Attribute represents a single value that is used to represent a specific pie
    "**.starttime**", "*Attribute*", "Return starttime"
    "**.endtime**", "*Attribute*", "Return endtime"
    "**.af_timerange**", "*Attribute*", "Return <OSIsoft.AF.Time.AFTimeRange object>"
-   "**.attributes**", "*Attribute*", "Return list of attribute names"
+   "**.attributes**", "*Attribute*", "Return list of Attribute objects"
    "**.af_attributes**", "*Attribute*", "Return list of <OSIsoft.AF.Asset.AFAttribute objects>"
    "**.children**", "*Attribute*", "Return EventList of children"
    "**.parent**", "*Attribute*", "Return parent event"
@@ -700,7 +737,7 @@ The Attribute represents a single value that is used to represent a specific pie
    "**.summaries**
    (tag_list, interval, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return one or more summary values for Tags in Taglist, for each interval"
    "**.filtered_summaries**
-   (tag_list, interval,summary_types, filter_expression, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, filter_interval=None)", "*Method*", "Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet filter the criteria"
+   (tag_list, interval,summary_types, filter_expression, dataserver=None, calculation_basis=CalculationBasis.EVENT_WEIGHTED, time_type=TimestampCalculation.AUTO, AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, filter_interval=None)", "*Method*", "Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet filter the criteria"
    "**.get_attribute_values**
    (attribute_names_list=[])", "*Method*", "Return dict of attribute values for specified attributes"
    "**.get_event_hierarchy**
@@ -720,15 +757,15 @@ The Attribute represents a single value that is used to represent a specific pie
    :header: "Atrribute/ Method", "Type", "Description"
    :widths: 30, 15, 50   
    
-   "**.add_attributes**
-   (attribute_names_list, template_name)", "*Method*", "Add attribute values to EventHierarchy for specified attributes, defined for the specified template"
-   "**.add_ref_elements**
+   "**.ehy.add_attributes**
+   (attribute_names_list, template_name)", "*Method*", "Add attribute values to EventHierarchy for specified attributes, for the specified template"
+   "**.ehy.add_ref_elements**
    (template_name)", "*Method*", "Add referenced element values to EventHierarchy, defined for the specified template"
-   "**.condense**
+   "**.ehy.condense**
    ()", "*Method*", "Condense the EventHierarchy object to return a vertically layered CondensedEventHierarchy object"
-   "**.interpol_discrete_extract**
+   "**.ehy.interpol_discrete_extract**
    (tag_list, interval, filter_expression='', dataserver=None, col=False)", "*Method*", "Return dataframe of interpolated data for discrete events of EventHierarchy, for the tag(s) specified"
-   "**.summary_extract**
+   "**.ehy.summary_extract**
    (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, col=False)", "*Method*", "Return dataframe of summary measures for discrete events of EventHierarchy, for the tag(s) specified"
    
    
@@ -736,15 +773,15 @@ The Attribute represents a single value that is used to represent a specific pie
    :header: "Atrribute/ Method", "Type", "Description"
    :widths: 30, 15, 50  
    
-   "**.interpol_discrete_extract**
+   "**.ecd.interpol_discrete_extract**
    (tag_list, interval, filter_expression='', dataserver=None, col=False)", "*Method*", "Return dataframe of interpolated values for discrete events on bottom level of condensed hierarchy"
-   "**.interpol_continuous_extract**
+   "**.ecd.interpol_continuous_extract**
    (tag_list, interval, filter_expression='', dataserver=None)", "*Method*", "Return dataframe of continous, interpolated values from the start of the first filtered event to the end of the last filtered event, for each procedure, on bottom level of condensed hierarchy"
-   "**.recorded_extract**
+   "**.ecd.recorded_extract**
    (tag_list, filter_expression='', AFBoundaryType=BoundaryType.INTERPOLATED, dataserver=None)", "*Method*", "Return nested dictionary (level 1: Procedures, Level 2: Tags) of recorded data extracts from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy"
-   "**.plot_continuous_extract**
+   "**.ecd.plot_continuous_extract**
    (tag_list, nr_of_intervals, dataserver=None)", "*Method*", "Return nested dictionary (level 1: Procedures, Level 2: Tags) of continuous plot values from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy. Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and at most one exceptional point (bad status or digital state)"
-   "**.summary_extract**
+   "**.ecd.summary_extract**
    (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, col=False)", "*Method*", "Return dataframe of summary values for events on bottom level of condensed hierarchy"
 
 
@@ -768,63 +805,103 @@ The Attribute represents a single value that is used to represent a specific pie
    "**.get_attribute_values**
    (attribute_names_list=[])", "*Method*", "Return dict of attribute values for specified attributes"
    "**.get_events**
-   (query=None, start_time=None, end_time='*', template_name = None, start_index=0, max_count=1000000, search_mode=SearchMode.OVERLAPPED, search_full_hierarchy=True, sortField=SortField.STARTTIME, sortOrder=SortOrder.ASCENDING)", "*Method*", "Return EventList of Events on Asset within specified time period that meets the query criteria"
+   (query=None, starttime, endtime, template_name = None, start_index=0, max_count=1000000, search_mode=SearchMode.OVERLAPPED, search_full_hierarchy=True, sortField=SortField.STARTTIME, sortOrder=SortOrder.ASCENDING)", "*Method*", "Return EventList of events on this Asset within specified time period that meets the query criteria"
    
+
+.. csv-table:: AssetList
+   :header: "Atrribute/ Method", "Type", "Description"
+   :widths: 30, 15, 50   
+   
+   "**.get_asset_hierarchy**
+   (depth=10)", "*Method*", "Return AssetHierarchy down to the specified depth"
+
 
 .. csv-table:: AssetHierarchy
    :header: "Atrribute/ Method", "Type", "Description"
    :widths: 30, 15, 50  
    
-   "**.add_attributes**
+   "**.ahy.add_attributes**
    (attribute_names_list, level)", "*Method*", "Add attributtes to AssetHierarchy for specified attributes and level"
-   "**.condense**
+   "**.ahy.condense**
    ()", "*Method*", "Condense the AssetHierarchy object to return a condensed, vertically layered representation of the Asset Tree"
 
 
-12. PIConstants
+.. csv-table:: Attribute
+   :header: "Atrribute/ Method", "Type", "Description"
+   :widths: 30, 15, 50  
+    
+   "**.name**", "*Attribute*", "Return name of Attribute"
+   "**.path**", "*Attribute*", "Return path"
+   "**.pisystem_name**", "*Attribute*", "Return PISystem name"
+   "**.database_name**", "*Attribute*", "Return connected database name"
+   "**.database**", "*Attribute*", "Return PIAFDatabase object"
+   "**.af_attribute**", "*Attribute*", "Return <OSIsoft.AF.Asset.AFAttribute object>"
+   "**.af_template**", "*Attribute*", "Return <OSIsoft.AF.Asset.AFAttributeTemplate object>"
+   "**.template_name**", "*Attribute*", "Return template name"
+   "**.parent**", "*Attribute*", "Return parent asset"
+   "**.description**", "*Attribute*", "Return description"
+   "**.uom**", "*Attribute*", "Return displayed Unit of Measurement (uom) for Attribute"
+   "**.type**", "*Attribute*", "Return datatype of Attribute"
+   "**.source_type**", "*Attribute*", "Return name of Attribute's data reference"
+   "**.pipoint**", "*Attribute*", "Return Tag object, if exists"
+   "**.current_value**
+   ()", "*Method*", "Return current value for Attribute"
+
+
+.. csv-table:: Calculation
+   :header: "Atrribute/ Method", "Type", "Description"
+   :widths: 30, 15, 50 
+
+   "**PIconnect.calc.calc_recorded**
+   (starttime, endtime, expression=r"")", "*Method*", "Returns dataframe that contains the result of evaluating the passed expression at each point in time over the passed time range where a recorded value exists for a member of the expression. Expression arguments need to be entered as raw strings: r'expresion'"
+    "**PIconnect.calc.calc_interpolated**
+   (starttime, endtime, interval, expression=r"")", "*Method*", "Returns dataframe that contains the result of evaluating the passed expression over the passed time range at a defined interval. Expression arguments need to be entered as raw strings: r'expresion'."
+
+
+14.    PIConstants
 *******************************************************
 PIConstants provides a defined set of arguments that can be passed to some of the class methods specified above to modify their behaviour. 
 They are imported from the PIConsts module and used as illustrated in the example below. 
 
 .. code-block:: python
 
-    import PIconnect
+    # import right class from PIConsts
+    from PIconnect.PIConsts import BoundaryType
 
-    # Initiate connection to PI data server & PI AF database of interest by
-    # defining their name
-    with PIconnect.PIAFDatabase(
-        server=afservers[0], database=afdatabases[0]
-    ) as afdatabase, PIconnect.PIServer(server=dataservers[0]) as server:
-
-        # Return Dataframe of recorded values for tags specified by list of
-        # tagnames (100_091_R014_TT04A) or Tags, within the event
-        recorded_values = event.recorded_values(
-            tag_list=["100_091_R014_TT04A"],
-            dataserver=server,
-            AFBoundaryType=BoundaryType.INSIDE,
+    # Initiate connection to PI data server & PI AF database of interest 
+    
+    #Select event
+    eventlist = afdatabase.find_events(
+        query="Operation A", starttime="1/1/2022", endtime="*"
         )
+    event =  eventlist[0]
 
-        # Now let's change the AFBoundaryType argument to INTERPOLATED
-        # Class BoundaryType has following options:
-        # Return the recorded values on the inside of the requested time range as
-        # the first and last values.
-        # INSIDE = 0
-        # Return the recorded values on the outside of the requested time range as
-        # the first and last values.
-        # OUTSIDE = 1
-        # Create an interpolated value at the end points of the requested time
-        # range if a recorded value does not exist at that time.
-        # INTERPOLATED = 2
+    # Return Dataframe of recorded values for tags specified by list of
+    # tagnames (100_091_R014_TT04A) or Tags, within the event
+    recorded_values = event.recorded_values(
+        tag_list=["SINUSOID"],
+        dataserver=server,
+        AFBoundaryType=BoundaryType.INSIDE,
+    )
 
-        # import right class from PIConsts
-        from PIConsts import BoundaryType
+    # Now let's change the AFBoundaryType argument to INTERPOLATED
+    # Class BoundaryType has following options:
+    # Return the recorded values on the inside of the requested time range as
+    # the first and last values.
+    # INSIDE = 0
+    # Return the recorded values on the outside of the requested time range as
+    # the first and last values.
+    # OUTSIDE = 1
+    # Create an interpolated value at the end points of the requested time
+    # range if a recorded value does not exist at that time.
+    # INTERPOLATED = 2
 
-        # lets set BoundaryType to BoundaryType.INTERPOLATED
-        recorded_values = event.recorded_values(
-            tag_list=["100_091_R014_TT04A"],
-            dataserver=server,
-            AFBoundaryType=BoundaryType.INTERPOLATED,
-        )
+    # lets set BoundaryType to BoundaryType.INTERPOLATED
+    recorded_values = event.recorded_values(
+        tag_list=["SINUSOID"],
+        dataserver=server,
+        AFBoundaryType=BoundaryType.INTERPOLATED,
+    )
 
 
 Copyright notice

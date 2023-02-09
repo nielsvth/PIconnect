@@ -214,7 +214,7 @@ class Attribute:
 
     @property
     def pipoint(self):
-        """Return PIPoint object, if exists"""
+        """Return Tag object, if exists"""
         try:
             return Tag(self.attribute.PIPoint)
         except:
@@ -258,9 +258,14 @@ class Attribute:
             return Event(self.attribute.Element)
 
     @property
-    def template(self):
+    def template_name(self):
         """Return template name for Attribute"""
         return self.attribute.Template.Name
+
+    @property
+    def af_template(self):
+        """Return AF_template for Attribute"""
+        return self.attribute.Template
 
     @property
     def type(self):

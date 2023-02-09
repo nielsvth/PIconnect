@@ -14,38 +14,31 @@ afserver = [
     in PIconnect.PIAFDatabase.servers[servName]["databases"].keys()
 ][0]
 
+
 # Initiate connection to PI data server & PI AF database of interest by
 # defining their name
 with PIconnect.PIAFDatabase(
     server=afserver, database="NuGreen"
-) as afdatabase, PIconnect.PIServer(server=dataservers[1]) as server:
+) as afdatabase, PIconnect.PIServer(
+    server=list(PIconnect.PIServer.servers.keys())[1]
+) as server:
 
-    # Attributes can be available for both Assets and Events
+    # Find 'SINUSOID' tag
+    tag = server.find_tags("SINUSOID")[0]
 
-    # Returns list of Assets that meets the query criteria
-    # Here a query is executed for an Asset with name 'P-560'
-    assetlist = afdatabase.find_assets(query="P-560")
+    # calculation on recorded values
+    # for overview of expression syntax: https://docs.aveva.com/bundle/pi-server-af-analytics/page/1021946.html
+    calc1 = PIconnect.calc.calc_recorded(
+        "1-10-2022 14:00",
+        "1-10-2022 22:00",
+        r"IF ('\\ITSBEBEPIHISCOL\SINUSOID' > 70) THEN (Abs('\\ITSBEBEPIHISCOL\SINUSOID')) ELSE (0)",
+    )
 
-    # Select the first Asset from the Asset list
-    asset = assetlist[0]
-
-    # select first attribute
-    attribute = asset.attributes[0]
-
-    print(attribute.source_type)
-    print(attribute.path)
-    print(attribute.description)
-    print(attribute.current_value())
-
-    # select first attribute that has a Tag/PIpoint as a source
-    attribute = [
-        attribute
-        for attribute in asset.attributes
-        if attribute.source_type == "PI Point"
-    ][0]
-
-    print(attribute.source_type)
-    print(attribute.path)
-    print(attribute.description)
-    print(attribute.pipoint)
-    print(attribute.current_value())
+    # calculation on interpolated values
+    # returns totalized value per minute, do *1440 to get per day
+    calc2 = PIconnect.calc.calc_interpolated(
+        "1-10-2022 14:00",
+        "1-10-2022 14:00",
+        "1h",
+        r"TagTot('\\ITSBEBEPIHISCOL\SINUSOID', '01-Oct-2022 14:00:00', '03-Oct-2022 14:00:00')",
+    )
