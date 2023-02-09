@@ -19,6 +19,21 @@ Tutorial
 1. Connection
 *******************************************************
 
+**AFDatabase**
+
+A custom NuGreen' database was created to test the package functionality.
+To import the NuGreen database, follow these steps:
+
+1. Import the database from the provided "NuGreen.xml" via PI System Explorer>File>Import from File.
+2. Verify that a root element "NuGreen" is created inside the NuGreen database.
+
+**PIServer**
+
+In case the default 'SINUSOID' and 'SINUSOIDU' tags do not exist on your PIserver. 
+
+- `How do I generate sinusoid/sinusoidu data in Pi Server 2018? <https://pisquare.osisoft.com/s/question/0D51I00004UHjpQSAT/how-do-i-generate-sinusoidsinusoidu-data-in-pi-server-2018>`_.
+
+
 .. code-block:: python
     
     #import PIconnect
@@ -399,7 +414,7 @@ For example, a Tag might store the flow rate from a meter, a controller's mode o
 
 .. code-block:: python
     
-        # Returns comprehensive overview of tags that meet the query criteria
+    # Returns comprehensive overview of tags that meet the query criteria
     # Quite slow and meant for tag exploration, for efficiently querying tags
     # the 'find_tags' method (cfr. infra) is preferred.
     tag_overview = server.tag_overview("SINUSOID*")
