@@ -21,7 +21,7 @@ def calc_recorded(
     """Returns dataframe that contains the result of evaluating the passed expression at each point in time
     over the passed time range where a recorded value exists for a member of the expression.
 
-    Expression arguments need to be entered as raw strings: r'expresion'"""
+    Expression arguments need to be entered as raw strings: r'expression'"""
     afrange = to_af_time_range(starttime, endtime)
     result = AF.Data.AFCalculation.CalculateAtRecordedValues(
         0, expression, afrange
@@ -53,7 +53,7 @@ def calc_interpolated(
     """Returns dataframe that contains the result of evaluating the passed expression
     over the passed time range at a defined interval.
 
-    Expression arguments need to be entered as raw strings: r'expresion'"""
+    Expression arguments need to be entered as raw strings: r'expression'"""
     afrange = to_af_time_range(starttime, endtime)
     afinterval = AF.Time.AFTimeSpan.Parse(interval)
     result = AF.Data.AFCalculation.CalculateAtIntervals(

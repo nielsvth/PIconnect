@@ -588,7 +588,7 @@ Core functionality for doing advanced calculations and filtering
 
 .. code-block:: python
 
-        #Find 'SINUSOID' tag
+    #Find 'SINUSOID' tag
     tag = server.find_tags("SINUSOID")[0]
 
     # calculation on recorded values
@@ -853,9 +853,9 @@ Core functionality for doing advanced calculations and filtering
    :widths: 30, 15, 50 
 
    "**PIconnect.calc.calc_recorded**
-   (starttime, endtime, expression=r"")", "*Method*", "Returns dataframe that contains the result of evaluating the passed expression at each point in time over the passed time range where a recorded value exists for a member of the expression. Expression arguments need to be entered as raw strings: r'expresion'"
+   (starttime, endtime, expression=r"")", "*Method*", "Returns dataframe that contains the result of evaluating the passed expression at each point in time over the passed time range where a recorded value exists for a member of the expression. Expression arguments need to be entered as raw strings: r'expression'"
     "**PIconnect.calc.calc_interpolated**
-   (starttime, endtime, interval, expression=r"")", "*Method*", "Returns dataframe that contains the result of evaluating the passed expression over the passed time range at a defined interval. Expression arguments need to be entered as raw strings: r'expresion'."
+   (starttime, endtime, interval, expression=r"")", "*Method*", "Returns dataframe that contains the result of evaluating the passed expression over the passed time range at a defined interval. Expression arguments need to be entered as raw strings: r'expression'."
 
 
 14.    PIConstants
