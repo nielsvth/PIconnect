@@ -509,16 +509,16 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
     # Returns TagList with tags that meet the query criteria
     taglist = server.find_tags("*SINUSOID*")
 
-    # Return the last recorded value for a Tag
+    # Return the last recorded value for tags in TagList
     current_value = taglist.current_value()
 
-    # Return interpolated values at the specified interval for Tag, between
+    # Return interpolated values at the specified interval for tags in TagList, between
     # starttime and endtime
     interpol_values = taglist.interpolated_values(
         starttime="*-20d", endtime="*-10d", interval="1h"
     )
 
-    # Return recorded values for Tag, between starttime and endtime
+    # Return recorded values for tags in TagList, between starttime and endtime
     recorded_values = taglist.recorded_values(starttime="*-5d", endtime="*-2d")
     # Optionally, specify a filter condition
     recorded_values = taglist.recorded_values(
@@ -538,18 +538,18 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
         starttime="*-20d", endtime="*-10d", nr_of_intervals=10
     )
 
-    # Return specified summary measure(s) for Tag within defined timeframe
+    # Return specified summary measure(s) for tags in TagList, within defined timeframe
     summary_values = taglist.summary(
         starttime="*-20d", endtime="*-10d", summary_types=2 | 4 | 8
     )
 
-    # Return one or more summary values for each interval for a Tag, within a
+    # Return one or more summary values for each interval for tags in TagList, within a
     # specified timeframe
     summaries_values = taglist.summaries(
         starttime="*-20d", endtime="*-10d", interval="1d", summary_types=2 | 4 | 8
     )
 
-    # Return one or more summary values for each interval for a Tag, within a
+    # Return one or more summary values for each interval for tags in TagList, within a
     # specified timeframe, for values that meet the specified filter condition
     filtered_summaries_values = taglist.filtered_summaries(
         starttime="*-20d",

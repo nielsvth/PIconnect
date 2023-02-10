@@ -15,14 +15,17 @@ def test_connection():
     ), "Should be larger or equal to 1"
 
 
-def test_calc_recorded(af_connect):
+def test_calc_recorded(af_connect, calc_timerange):
     """Test functionalty of Calculation class: recorded values"""
+    starttime = calc_timerange[0]
+    endtime = calc_timerange[1]
+
     server = af_connect[1]
     tag = server.find_tags("SINUSOID")[0]
 
     calc1 = PIconnect.calc.calc_recorded(
-        "1-10-2022 14:00",
-        "1-10-2022 22:00",
+        starttime,
+        endtime,
         r"IF ('\\ITSBEBEPIHISCOL\SINUSOID' > 70) THEN (Abs('\\ITSBEBEPIHISCOL\SINUSOID')) ELSE (0)",
     )
     assert calc1.shape == (8, 1), "shape should be (8,1)"
@@ -32,12 +35,14 @@ def test_calc_recorded(af_connect):
     ), "Should be 91.82201"
 
 
-def test_calc_interpol(af_connect):
+def test_calc_interpol(calc_timerange):
     """Test functionalty of Calculation class: interpolated values"""
+    starttime = calc_timerange[0]
+    endtime = calc_timerange[1]
 
     calc2 = PIconnect.calc.calc_interpolated(
-        "1-10-2022 14:00",
-        "1-10-2022 22:00",
+        starttime,
+        endtime,
         "1h",
         r"IF ('\\ITSBEBEPIHISCOL\SINUSOID' > 70) THEN (Abs('\\ITSBEBEPIHISCOL\SINUSOID')+10) ELSE (0)",
     )
@@ -49,8 +54,8 @@ def test_calc_interpol(af_connect):
     # https://docs.osisoft.com/bundle/pi-server/page/tagtot.html
     # returns totalized value per minute, do *1440 to get per day
     calc3 = PIconnect.calc.calc_interpolated(
-        "1-10-2022 14:00",
-        "1-10-2022 14:00",
+        starttime,
+        starttime,
         "1h",
         r"TagTot('\\ITSBEBEPIHISCOL\SINUSOID', '01-Oct-2022 14:00:00', '03-Oct-2022 14:00:00')",
     )

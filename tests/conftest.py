@@ -71,3 +71,10 @@ def af_timerange() -> Tuple[datetime, datetime]:
     start_date = datetime(day=1, month=10, year=2022)
     end_date = datetime(day=4, month=10, year=2022)
     return (start_date, end_date)
+
+
+@pytest.fixture(scope="package")
+def calc_timerange() -> Tuple[datetime, datetime]:
+    start_date = datetime(day=1, month=10, year=2022, hour=14)
+    end_date = datetime(day=1, month=10, year=2022, hour=22)
+    return (start_date, end_date)
