@@ -1,9 +1,10 @@
 import PIconnect
 from datetime import datetime
+from tzlocal import get_localzone_name
 
 # set up timezone. Pick timezone from
 # https://gist.github.com/heyalexej/8bf688fd67d7199be4a1682b3eec7568
-PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
+PIconnect.PIConfig.DEFAULT_TIMEZONE = get_localzone_name()
 
 # Find AF server that contains custom "NuGreen" database
 # See instructions above on how to set up the "NuGreen" database for testing purposes
@@ -42,3 +43,13 @@ with PIconnect.PIAFDatabase(
         "1h",
         r"TagTot('\\ITSBEBEPIHISCOL\SINUSOID', '01-Oct-2022 14:00:00', '03-Oct-2022 14:00:00')",
     )
+
+    taglist = server.find_tags("SINUSOID")
+    tag = taglist[0]
+    starttime = datetime(day=1, month=1, year=2022)
+    
+    x = tag.interpolated_value(time="1-1-2022 00:00:00")[1]
+    x = tag.interpolated_value(time="31-12-2021 18:00:00")[1]
+    x = tag.interpolated_value(time="1-1-2022 06:00:00")[1]
+
+    

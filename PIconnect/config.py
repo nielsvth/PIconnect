@@ -1,5 +1,6 @@
+from tzlocal import get_localzone_name
 class PIConfigContainer:
-    _default_timezone = "UTC"
+    _default_timezone = get_localzone_name()
 
     @property
     def DEFAULT_TIMEZONE(self):

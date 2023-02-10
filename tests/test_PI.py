@@ -30,25 +30,28 @@ def test_find_tags(af_connect):
     ), "tag description should be '12 Hour Sine Wave'"
 
 
-def test_tags(af_connect):
+def test_tags(af_connect, pi_timerange):
     """Test functionalty of the Tag/Pipoint class"""
+    starttime = pi_timerange[0]
+    endtime = pi_timerange[1]
+
     server = af_connect[1]
     taglist = server.find_tags("SINUSOID")
     tag = taglist[0]
 
     # interpolated value
     assert (
-        type(tag.interpolated_value(time="1-1-2022")[0]) == datetime.datetime
+        type(tag.interpolated_value(time=starttime)[0]) == datetime.datetime
     ), "type should be datetime.datetime"
     assert (
-        tag.interpolated_value(time="1-1-2022")[1] == 49.45119
+        tag.interpolated_value(time=starttime)[1] == 49.45119
     ), "result should be 49.45119"
 
     # interpolated values
     assert (
         len(
             tag.interpolated_values(
-                starttime="1-1-2022", endtime="10-1-2022", interval="1h"
+                starttime=starttime, endtime=endtime, interval="1h"
             )
         )
         == 217
@@ -56,16 +59,15 @@ def test_tags(af_connect):
 
     # recorded values
     assert (
-        len(tag.recorded_values(starttime="1-1-2022", endtime="10-1-2022"))
-        == 146
+        len(tag.recorded_values(starttime=starttime, endtime=endtime)) == 146
     ), "length of result should be 146"
 
     # recorded values, with filter expression
     assert (
         len(
             tag.recorded_values(
-                starttime="1-1-2022",
-                endtime="10-1-2022",
+                starttime=starttime,
+                endtime=endtime,
                 filter_expression="'%tag%' > 30",
             )
         )
@@ -74,8 +76,8 @@ def test_tags(af_connect):
 
     assert (
         tag.recorded_values(
-            starttime="1-1-2022",
-            endtime="10-1-2022",
+            starttime=starttime,
+            endtime=starttime,
             filter_expression="'%tag%' > 30",
         )["SINUSOID"].min()
         == 49.45119
@@ -85,7 +87,7 @@ def test_tags(af_connect):
     assert (
         len(
             tag.plot_values(
-                starttime="1-1-2022", endtime="10-1-2022", nr_of_intervals=10
+                starttime=starttime, endtime=endtime, nr_of_intervals=10
             )
         )
         == 39
@@ -95,8 +97,8 @@ def test_tags(af_connect):
     assert (
         len(
             tag.summary(
-                starttime="1-1-2022",
-                endtime="10-1-2022",
+                starttime=starttime,
+                endtime=endtime,
                 summary_types=2 | 4 | 8,
             )
         )
@@ -107,8 +109,8 @@ def test_tags(af_connect):
     assert (
         len(
             tag.summaries(
-                starttime="1-1-2022",
-                endtime="10-1-2022",
+                starttime=starttime,
+                endtime=endtime,
                 interval="1d",
                 summary_types=2 | 4 | 8,
             )
@@ -120,8 +122,8 @@ def test_tags(af_connect):
     assert (
         len(
             tag.filtered_summaries(
-                starttime="1-1-2022",
-                endtime="10-1-2022",
+                starttime=starttime,
+                endtime=endtime,
                 interval="1d",
                 summary_types=2 | 4 | 8,
                 filter_expression="'SINUSOID' > 20",
@@ -132,8 +134,8 @@ def test_tags(af_connect):
 
     assert (
         tag.filtered_summaries(
-            starttime="1-1-2022",
-            endtime="10-1-2022",
+            starttime=starttime,
+            endtime=endtime,
             interval="1d",
             summary_types=2 | 4 | 8,
             filter_expression="'SINUSOID' > 20",
@@ -142,8 +144,11 @@ def test_tags(af_connect):
     ), "minimum value should be 24.005191802978516"
 
 
-def test_taglist(af_connect):
+def test_taglist(af_connect, pi_timerange):
     """Test functionalty of the TagList class"""
+    starttime = pi_timerange[0]
+    endtime = pi_timerange[1]
+
     server = af_connect[1]
     taglist1 = server.find_tags("SINUSOID")
     taglist2 = server.find_tags("SINUSOIDU")
@@ -162,24 +167,22 @@ def test_taglist(af_connect):
 
     # interpolated values
     assert taglist.interpolated_values(
-        starttime="1-1-2022", endtime="10-1-2022", interval="1h"
+        starttime=starttime, endtime=endtime, interval="1h"
     ).shape == (217, 2), "shape of result should be (217, 2)"
 
     # recorded values
     assert (
-        type(
-            taglist.recorded_values(starttime="1-1-2022", endtime="10-1-2022")
-        )
+        type(taglist.recorded_values(starttime=starttime, endtime=endtime))
         == dict
     ), "returns a dict object"
-    assert taglist.recorded_values(starttime="1-1-2022", endtime="10-1-2022")[
+    assert taglist.recorded_values(starttime=starttime, endtime=endtime)[
         "SINUSOID"
     ].shape == (146, 1), "shape of 'SINUSOID' table is (146,1)"
 
     # plot values
     assert list(
         taglist.plot_values(
-            starttime="1-1-2022", endtime="10-1-2022", nr_of_intervals=10
+            starttime=starttime, endtime=endtime, nr_of_intervals=10
         ).keys()
     ) == [
         "SINUSOID",
@@ -187,15 +190,15 @@ def test_taglist(af_connect):
     ], "returns a dict object with keys ['SINUSOID', 'SINUSOIDU']"
 
     assert taglist.plot_values(
-        starttime="1-1-2022", endtime="10-1-2022", nr_of_intervals=10
+        starttime=starttime, endtime=endtime, nr_of_intervals=10
     )["SINUSOID"].shape == (39, 1), "shape of 'SINUSOID' table is (39,1)"
 
     # summary values
     assert (
         len(
             taglist.summary(
-                starttime="1-1-2022",
-                endtime="10-1-2022",
+                starttime=starttime,
+                endtime=endtime,
                 summary_types=2 | 4 | 8,
             )
         )
@@ -206,8 +209,8 @@ def test_taglist(af_connect):
     assert (
         len(
             taglist.summaries(
-                starttime="1-1-2022",
-                endtime="10-1-2022",
+                starttime=starttime,
+                endtime=endtime,
                 interval="1d",
                 summary_types=2 | 4 | 8,
             )
@@ -219,8 +222,8 @@ def test_taglist(af_connect):
     assert (
         len(
             taglist.filtered_summaries(
-                starttime="1-1-2022",
-                endtime="10-1-2022",
+                starttime=starttime,
+                endtime=endtime,
                 interval="1d",
                 summary_types=2 | 4 | 8,
                 filter_expression="'SINUSOID' > 20",
@@ -231,8 +234,8 @@ def test_taglist(af_connect):
 
     assert (
         taglist.filtered_summaries(
-            starttime="1-1-2022",
-            endtime="10-1-2022",
+            starttime=starttime,
+            endtime=endtime,
             interval="1d",
             summary_types=2 | 4 | 8,
             filter_expression="'SINUSOID' > 20",

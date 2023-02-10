@@ -31,11 +31,14 @@ def test_find_assets(af_connect):
     ), "Should be 'Wichita'"
 
 
-def test_find_events(af_connect):
+def test_find_events(af_connect, af_timerange):
     """Test to find events on AFDatabase"""
+    starttime = af_timerange[0]
+    endtime = af_timerange[1]
+
     afdatabase = af_connect[0]
     eventlist = afdatabase.find_events(
-        query="*", starttime="2/10/2022 11:29:12", endtime="3/10/2022 17:18:44"
+        query="*", starttime=starttime, endtime=endtime
     )
     assert len(eventlist) == 6, "Should be 6"
     event = eventlist[0]
@@ -85,17 +88,20 @@ def test_attribute_extracts(af_connect):
     result = asset.attributes[-8].current_value()
     assert type(result) == float, "Output type should be a float"
 
-    # Attrobite is a Table lookup
+    # Attribute is a Table lookup
     assert (
         type(asset.attributes[-11].current_value()) == datetime.datetime
     ), "Output type should be datetime.datetime"
 
 
-def test_event_extracts(af_connect):
+def test_event_extracts(af_connect, af_timerange):
     """Test extraction functionalty for Events"""
+    starttime = af_timerange[0]
+    endtime = af_timerange[1]
+
     afdatabase, server = af_connect
     eventlist = afdatabase.find_events(
-        query="*", starttime="2/10/2022 11:29:12", endtime="3/10/2022 17:18:44"
+        query="*", starttime=starttime, endtime=endtime
     )
     event = eventlist[0]
 
@@ -162,11 +168,14 @@ def test_event_extracts(af_connect):
     assert result["Value"].min() == 24.235179901123047
 
 
-def test_eventhierarchy(af_connect):
+def test_eventhierarchy(af_connect, af_timerange):
     """Test functionalty for EventHierarchy class"""
+    starttime = af_timerange[0]
+    endtime = af_timerange[1]
+
     afdatabase, server = af_connect
     eventlist = afdatabase.find_events(
-        query="*", starttime="2/10/2022 11:29:12", endtime="3/10/2022 17:18:44"
+        query="*", starttime=starttime, endtime=endtime
     )
     eventhierarchy = eventlist.get_event_hierarchy(depth=2)
     assert (
@@ -256,11 +265,14 @@ def test_eventhierarchy(af_connect):
         assert str(e) == "No tags were found for query: SINUSOIiD"
 
 
-def test_condensed(af_connect):
+def test_condensed(af_connect, af_timerange):
     """Test functionalty for CondensedHierarchy class"""
+    starttime = af_timerange[0]
+    endtime = af_timerange[1]
+
     afdatabase, server = af_connect
     eventlist = afdatabase.find_events(
-        query="*", starttime="2/10/2022 11:29:12", endtime="3/10/2022 17:18:44"
+        query="*", starttime=starttime, endtime=endtime
     )
     eventhierarchy = eventlist.get_event_hierarchy(depth=2)
 
