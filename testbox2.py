@@ -47,9 +47,9 @@ with PIconnect.PIAFDatabase(
     taglist = server.find_tags("SINUSOID")
     tag = taglist[0]
     starttime = datetime(day=1, month=1, year=2022)
-    
+
     x = tag.interpolated_value(time="1-1-2022 00:00:00")[1]
     x = tag.interpolated_value(time="31-12-2021 18:00:00")[1]
     x = tag.interpolated_value(time="1-1-2022 06:00:00")[1]
 
-    
+    tag.interpolated_value(time=datetime(day=1, month=1, year=2022))

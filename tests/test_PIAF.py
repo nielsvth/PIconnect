@@ -4,10 +4,6 @@ import PIconnect
 import datetime
 import pandas as pd
 
-# Set up timezone info
-PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
-
-
 def test_connection():
     """Test to check for connected servers and AF Databases"""
     assert (

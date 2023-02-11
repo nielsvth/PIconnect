@@ -1,11 +1,7 @@
 """Unit Tests for calc.py Module""" ""
 
 import PIconnect
-import datetime
 import pandas as pd
-
-# Set up timezone info
-PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
 
 
 def test_connection():
@@ -31,7 +27,7 @@ def test_calc_recorded(af_connect, calc_timerange):
     assert calc1.shape == (8, 1), "shape should be (8,1)"
     assert (
         calc1["calculation"].iloc[0]
-        == tag.interpolated_value("2022-10-01 14:00:00")[1]
+        == tag.interpolated_value("2022-oct-01 14:00:00")[1]
     ), "Should be 91.82201"
 
 
