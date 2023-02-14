@@ -1121,6 +1121,9 @@ class Event:
         tag_list: List[Union[str, Tag]],
         nr_of_intervals: int,
         dataserver: PIServer = None,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.TagCount, 1000
+        ),
     ) -> Dict[str, pd.DataFrame]:
         """Retrieves values over the specified time range suitable for
         plotting over the number of intervals (typically represents pixels).
@@ -1142,7 +1145,10 @@ class Event:
         """
         taglist = convert_to_TagList(tag_list, dataserver)
         return taglist.plot_values(
-            self.starttime, self.endtime, nr_of_intervals
+            self.starttime,
+            self.endtime,
+            nr_of_intervals,
+            paging_config=paging_config,
         )
 
     def interpolated_values(
@@ -1151,6 +1157,9 @@ class Event:
         interval: str,
         filter_expression: str = "",
         dataserver: PIServer = None,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.TagCount, 1000
+        ),
     ) -> pd.DataFrame:
         """Retrieve interpolated values for each Tag in TagList
 
@@ -1173,7 +1182,11 @@ class Event:
                 datetime.utcnow().replace(tzinfo=utc).astimezone(local_tz)
             )
         return taglist.interpolated_values(
-            self.starttime, endtime, interval, filter_expression
+            self.starttime,
+            endtime,
+            interval,
+            filter_expression,
+            paging_config=paging_config,
         )
 
     def recorded_values(
@@ -1182,6 +1195,9 @@ class Event:
         dataserver: PIServer = None,
         filter_expression: str = "",
         AFBoundaryType: BoundaryType = BoundaryType.INSIDE,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.TagCount, 1000
+        ),
     ) -> Dict[str, pd.DataFrame]:
         """Retrieve recorded values for each Tag in TagList within the event
 
@@ -1199,7 +1215,11 @@ class Event:
         """
         taglist = convert_to_TagList(tag_list, dataserver)
         return taglist.recorded_values(
-            self.starttime, self.endtime, filter_expression, AFBoundaryType
+            self.starttime,
+            self.endtime,
+            filter_expression,
+            AFBoundaryType,
+            paging_config=paging_config,
         )
 
     def summary(
@@ -1209,6 +1229,9 @@ class Event:
         dataserver: PIServer = None,
         calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
         time_type: TimestampCalculation = TimestampCalculation.AUTO,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.TagCount, 1000
+        ),
     ) -> pd.DataFrame:
         """Return specified summary measure(s) for event
 
@@ -1259,6 +1282,7 @@ class Event:
             summary_types,
             calculation_basis,
             time_type,
+            paging_config=paging_config,
         )
 
     # summaries
@@ -1270,6 +1294,9 @@ class Event:
         dataserver: PIServer = None,
         calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
         time_type: TimestampCalculation = TimestampCalculation.AUTO,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.TagCount, 1000
+        ),
     ) -> pd.DataFrame:
         """Return one or more summary values for Tags in Taglist
         for each interval
@@ -1323,6 +1350,7 @@ class Event:
             summary_types,
             calculation_basis,
             time_type,
+            paging_config=paging_config,
         )
 
     # filtered summaries
@@ -1337,6 +1365,9 @@ class Event:
         time_type=TimestampCalculation.AUTO,
         AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES,
         filter_interval: str = None,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.TagCount, 1000
+        ),
     ) -> pd.DataFrame:
         """For each Tag in TagList, return one or more summary values for each
         interval, for values that meet the specified filter condition
@@ -1398,6 +1429,7 @@ class Event:
             time_type,
             AFfilter_evaluation,
             filter_interval,
+            paging_config=paging_config,
         )
 
     def get_attribute_values(
@@ -1657,6 +1689,9 @@ class EventHierarchy:
         filter_expression="",
         dataserver: PIServer = None,
         col: bool = False,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.EventCount, 1000
+        ),
     ) -> pd.DataFrame:
         """Return dataframe of interpolated data for discrete events of
         EventHierarchy, for the tag(s) specified
@@ -1694,7 +1729,10 @@ class EventHierarchy:
             df["Time"] = df["Event"].apply(
                 lambda x: list(
                     x.interpolated_values(
-                        taglist, interval, filter_expression
+                        taglist,
+                        interval,
+                        filter_expression,
+                        paging_config=paging_config,
                     ).to_records(index=True)
                 )
             )
@@ -1716,6 +1754,7 @@ class EventHierarchy:
                             interval,
                             filter_expression,
                             dataserver,
+                            paging_config=paging_config,
                         )
                         .to_records(index=True)
                     ),
@@ -1755,6 +1794,9 @@ class EventHierarchy:
         calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
         time_type=TimestampCalculation.AUTO,
         col=False,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.EventCount, 1000
+        ),
     ) -> pd.DataFrame:
         """Return dataframe of summary measures for discrete events of
         EventHierarchy, for the tag(s) specified
@@ -1827,6 +1869,7 @@ class EventHierarchy:
                         dataserver,
                         calculation_basis,
                         time_type,
+                        paging_config=paging_config,
                     ).to_records(index=False)
                 )
             )
@@ -1849,6 +1892,7 @@ class EventHierarchy:
                             dataserver,
                             calculation_basis,
                             time_type,
+                            paging_config=paging_config,
                         )
                         .to_records(index=False)
                     ),
@@ -1867,9 +1911,6 @@ class EventHierarchy:
         df[["Tag", "Summary", "Value", "Time"]] = df["Time"].apply(
             pd.Series
         )  # explode list to columns
-        df["Time"] = df["Time"].apply(
-            lambda x: add_timezone(x) if not pd.isnull(x) else x
-        )
         df.reset_index(drop=True, inplace=True)
 
         return df
@@ -1927,6 +1968,9 @@ class CondensedEventHierarchy:
         filter_expression="",
         dataserver: PIServer = None,
         col: bool = False,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.EventCount, 1000
+        ),
     ) -> pd.DataFrame:
         """dataframe of interpolated values for discrete events on bottom
         level of condensed hierarchy
@@ -1982,6 +2026,7 @@ class CondensedEventHierarchy:
                         taglist,
                         interval,
                         filter_expression,
+                        paging_config=paging_config,
                     ).to_records(index=True)
                 )
             )
@@ -2027,7 +2072,11 @@ class CondensedEventHierarchy:
                 lambda row: list(
                     row[event]
                     .interpolated_values(
-                        [row[tags]], interval, filter_expression, dataserver
+                        [row[tags]],
+                        interval,
+                        filter_expression,
+                        dataserver,
+                        paging_config=paging_config,
                     )
                     .to_records(index=True)
                 ),
@@ -2061,6 +2110,9 @@ class CondensedEventHierarchy:
         interval: str,
         filter_expression: str = "",
         dataserver: PIServer = None,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.EventCount, 1000
+        ),
     ) -> pd.DataFrame:
         """dataframe of continous, interpolated values from the start of the
         first filtered event to the end of the last filtered event, for each
@@ -2110,7 +2162,11 @@ class CondensedEventHierarchy:
             endtime = df_proc["Event"].iloc[-1].endtime
             values = list(
                 taglist.interpolated_values(
-                    starttime, endtime, interval, filter_expression
+                    starttime,
+                    endtime,
+                    interval,
+                    filter_expression,
+                    paging_config=paging_config,
                 ).to_records(index=True)
             )
             df_cont = pd.concat(
@@ -2159,6 +2215,9 @@ class CondensedEventHierarchy:
         filter_expression="",
         AFBoundaryType: BoundaryType = BoundaryType.INTERPOLATED,
         dataserver: PIServer = None,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.EventCount, 1000
+        ),
     ) -> Dict[str, Dict[str, pd.DataFrame]]:
         """Return nested dictionary (level 1: Procedures, Level 2: Tags) of
         recorded data extracts from the start of the first filtered event to
@@ -2214,6 +2273,7 @@ class CondensedEventHierarchy:
                 endtime,
                 filter_expression,
                 AFBoundaryType=AFBoundaryType,
+                paging_config=paging_config,
             )
             for tag, df_rec in values.items():
                 # add Event info back
@@ -2240,6 +2300,9 @@ class CondensedEventHierarchy:
         tag_list: List[Union[str, Tag]],
         nr_of_intervals: int,
         dataserver: PIServer = None,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.EventCount, 1000
+        ),
     ) -> Dict[str, Dict[str, pd.DataFrame]]:
         """Return nested dictionary (level 1: Procedures, Level 2: Tags) of
         continuous plot values from the start of the first filtered event to
@@ -2292,7 +2355,12 @@ class CondensedEventHierarchy:
         for proc, df_proc in df_base.groupby("Procedure"):
             starttime = df_proc["Event"].iloc[0].starttime
             endtime = df_proc["Event"].iloc[-1].endtime
-            values = taglist.plot_values(starttime, endtime, nr_of_intervals)
+            values = taglist.plot_values(
+                starttime,
+                endtime,
+                nr_of_intervals,
+                paging_config=paging_config,
+            )
             for tag, df_rec in values.items():
                 # add Event info back
                 df_rec["Event"] = np.nan
@@ -2321,6 +2389,9 @@ class CondensedEventHierarchy:
         calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
         time_type: TimestampCalculation = TimestampCalculation.AUTO,
         col: bool = False,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.EventCount, 1000
+        ),
     ) -> pd.DataFrame:
         """Return dataframe of summary values for events on bottom level of
         condensed hierarchy
@@ -2405,7 +2476,11 @@ class CondensedEventHierarchy:
             df["Time"] = df["Event"].apply(
                 lambda x: list(
                     x.summary(
-                        taglist, summary_types, calculation_basis, time_type
+                        taglist,
+                        summary_types,
+                        calculation_basis,
+                        time_type,
+                        paging_config=paging_config,
                     ).to_records(index=False)
                 )
             )
@@ -2442,6 +2517,7 @@ class CondensedEventHierarchy:
                         dataserver,
                         calculation_basis,
                         time_type,
+                        paging_config=paging_config,
                     )
                     .to_records(index=False)
                 ),
@@ -2455,7 +2531,6 @@ class CondensedEventHierarchy:
         df[["Tag", "Summary", "Value", "Time"]] = df["Time"].apply(
             pd.Series
         )  # explode list to columns
-        df["Time"] = df["Time"].apply(lambda x: add_timezone(x))
         df.reset_index(drop=True, inplace=True)
 
         return df

@@ -6,6 +6,9 @@ import PIconnect
 from datetime import datetime
 from tzlocal import get_localzone_name
 
+# import pytz
+from pytz import timezone
+
 
 @pytest.fixture(scope="package")
 def afdatabase() -> Tuple[str, str]:
@@ -61,20 +64,32 @@ def af_connect(
 
 @pytest.fixture(scope="package")
 def pi_timerange() -> Tuple[datetime, datetime]:
-    start_date = datetime(day=1, month=1, year=2022)
-    end_date = datetime(day=10, month=1, year=2022)
+    start_date = datetime(day=1, month=1, year=2022).astimezone(
+        timezone("Europe/Brussels")
+    )
+    end_date = datetime(day=10, month=1, year=2022).astimezone(
+        timezone("Europe/Brussels")
+    )
     return (start_date, end_date)
 
 
 @pytest.fixture(scope="package")
 def af_timerange() -> Tuple[datetime, datetime]:
-    start_date = datetime(day=1, month=10, year=2022)
-    end_date = datetime(day=4, month=10, year=2022)
+    start_date = datetime(day=1, month=10, year=2022).astimezone(
+        timezone("Europe/Brussels")
+    )
+    end_date = datetime(day=4, month=10, year=2022).astimezone(
+        timezone("Europe/Brussels")
+    )
     return (start_date, end_date)
 
 
 @pytest.fixture(scope="package")
 def calc_timerange() -> Tuple[datetime, datetime]:
-    start_date = datetime(day=1, month=10, year=2022, hour=14)
-    end_date = datetime(day=1, month=10, year=2022, hour=22)
+    start_date = datetime(day=1, month=10, year=2022, hour=14).astimezone(
+        timezone("Europe/Brussels")
+    )
+    end_date = datetime(day=1, month=10, year=2022, hour=22).astimezone(
+        timezone("Europe/Brussels")
+    )
     return (start_date, end_date)

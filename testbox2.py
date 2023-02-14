@@ -48,6 +48,9 @@ with PIconnect.PIAFDatabase(
     tag = taglist[0]
     starttime = datetime(day=1, month=1, year=2022)
 
+    PIconnect.PIConfig.DEFAULT_TIMEZONE = get_localzone_name()
+    # PIconnect.PIConfig.DEFAULT_TIMEZONE = 'America/New_York'
+
     x = tag.interpolated_value(time="1-1-2022 00:00:00")[1]
     x = tag.interpolated_value(time="31-12-2021 18:00:00")[1]
     x = tag.interpolated_value(time="1-1-2022 06:00:00")[1]

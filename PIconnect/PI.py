@@ -841,6 +841,9 @@ class TagList(UserList):
         starttime: Union[str, datetime.datetime],
         endtime: Union[str, datetime.datetime],
         nr_of_intervals: int,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.TagCount, 1000
+        ),
     ) -> Dict[str, pd.DataFrame]:
         """Retrieves values over the specified time range suitable for plotting
         over the number of intervals (typically represents pixels).Returns a
@@ -862,7 +865,7 @@ class TagList(UserList):
         result = PIPointlist.PlotValues(
             AFTimeRange,
             nr_of_intervals,
-            AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000),
+            paging_config,
         )
 
         if result:
@@ -893,6 +896,9 @@ class TagList(UserList):
         endtime: Union[str, datetime.datetime],
         interval: str,
         filter_expression: str = "",
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.TagCount, 1000
+        ),
     ) -> pd.DataFrame:
         """Retrieve interpolated values for each Tag in TagList
 
@@ -918,7 +924,7 @@ class TagList(UserList):
             AFInterval,
             filter_expression,
             False,
-            AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000),
+            paging_config,
         )
 
         if result:
@@ -945,6 +951,9 @@ class TagList(UserList):
         endtime: Union[str, datetime.datetime],
         filter_expression: str = "",
         AFBoundaryType: BoundaryType = BoundaryType.INTERPOLATED,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.TagCount, 1000
+        ),
     ) -> Dict[str, pd.DataFrame]:
         """Retrieve recorded values for each Tag in TagList
 
@@ -972,7 +981,7 @@ class TagList(UserList):
             AFBoundaryType,
             filter_expression,
             False,
-            AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000),
+            paging_config,
         )
 
         if result:
@@ -1004,6 +1013,9 @@ class TagList(UserList):
         summary_types: int,
         calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
         time_type: TimestampCalculation = TimestampCalculation.AUTO,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.TagCount, 1000
+        ),
     ) -> pd.DataFrame:
         """Return specified summary measure(s) for Tags in Taglist within
         the specified timeframe.
@@ -1055,7 +1067,7 @@ class TagList(UserList):
             summary_types,
             calculation_basis,
             time_type,
-            AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000),
+            paging_config,
         )
         # to avoid queue emptying
         data = list(result)
@@ -1086,6 +1098,9 @@ class TagList(UserList):
         summary_types: int,
         calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
         time_type: TimestampCalculation = TimestampCalculation.AUTO,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.TagCount, 1000
+        ),
     ) -> pd.DataFrame:
         """For each Tag in TagList, return specified summary measure(s) for
         each interval within the specified timeframe
@@ -1140,7 +1155,7 @@ class TagList(UserList):
             summary_types,
             calculation_basis,
             time_type,
-            AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000),
+            paging_config,
         )
         data = list(result)
         df_final = pd.DataFrame()
@@ -1186,6 +1201,9 @@ class TagList(UserList):
         time_type: TimestampCalculation = TimestampCalculation.AUTO,
         AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.EXPRESSION_RECORDED_VALUES,  # noqa
         filter_interval: str = None,
+        paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
+            AF.PI.PIPageType.TagCount, 1000
+        ),
     ) -> pd.DataFrame:
         """For each Tag in TagList, return one or more summary values for each
         interval, within a specified timeframe, for values that meet the
@@ -1249,7 +1267,7 @@ class TagList(UserList):
             AFfilter_evaluation,
             AFfilter_interval,
             time_type,
-            AF.PI.PIPagingConfiguration(AF.PI.PIPageType.TagCount, 1000),
+            paging_config,
         )
 
         data = list(result)
