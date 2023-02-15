@@ -55,4 +55,36 @@ with PIconnect.PIAFDatabase(
     x = tag.interpolated_value(time="31-12-2021 18:00:00")[1]
     x = tag.interpolated_value(time="1-1-2022 06:00:00")[1]
 
+    from datetime import datetime
+    from tzlocal import get_localzone_name
+    from pytz import timezone
+
     tag.interpolated_value(time=datetime(day=1, month=1, year=2022))
+    tag.interpolated_value(
+        time=datetime(
+            day=1, month=1, year=2022, tzinfo=timezone("Europe/Brussels")
+        )
+    )
+
+    datetime(
+        day=1, month=1, year=2022, tzinfo=timezone("Europe/Brussels")
+    ).strftime("%Y-%m-%d %H:%M:%S %Z%z")
+
+    datetime(day=1, month=1, year=2022).astimezone(timezone("Europe/Brussels"))
+    datetime(day=1, month=1, year=2022).astimezone(
+        timezone("America/New_York")
+    )
+
+    timezone("America/New_York").localize(datetime(day=1, month=1, year=2022))
+    timezone("Europe/Brussels").localize(datetime(day=1, month=1, year=2022))
+
+    tag.interpolated_value(
+        time=datetime(day=1, month=1, year=2022).astimezone(
+            timezone("Europe/Brussels")
+        )
+    )
+    tag.interpolated_value(
+        time=datetime(day=1, month=1, year=2022).astimezone(
+            timezone("America/New_York")
+        )
+    )

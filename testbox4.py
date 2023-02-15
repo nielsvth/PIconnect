@@ -1,43 +1,70 @@
 import PIconnect
-import datetime
+import pandas as pd
+import numpy as np
+from datetime import datetime
+from PIconnect.AFSDK import AF
+from PIconnect.PI import (
+    convert_to_TagList,
+)
+from PIconnect.time import timestamp_to_index, add_timezone
 
 # Set up timezone info
 PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
 
 with PIconnect.PIAFDatabase(
-    server="PIMS_EU_BEERSE_AF_PE", database="DeltaV-Events"
-) as afdatabase, PIconnect.PIServer(server="ITSBEBEPIHISCOL") as server:
+    server="ITSBEBEWSP06182 DEV", database="NuGreen"
+) as afdatabase, PIconnect.PIServer() as server:
 
-   taglist = server.find_tags('SINUSOID')
+    starttime = datetime(day=1, month=10, year=2022)
+    endtime = datetime(day=4, month=10, year=2022)
 
-   x = taglist.interpolated_values(starttime="1/1/2022 14:00", endtime="1/1/2022 16:00", interval='1h')
-   
-   tag_list: 
-    interval: 
-    filter_expression = "",
+    eventlist = afdatabase.find_events(
+        query="*", starttime=starttime, endtime=endtime
+    )
+    eventhierarchy = eventlist.get_event_hierarchy(depth=2)
+
+    # add attributes
+    eventhierarchy = eventhierarchy.ehy.add_attributes(
+        attribute_names_list=["Equipment", "Manufacturer"],
+        template_name="Unit_template",
+    )
+
+    # add referenced elements
+    eventhierarchy = eventhierarchy.ehy.add_ref_elements(
+        template_name="Operation_template"
+    )
+
+    # create condensed dataframe
+    condensed = eventhierarchy.ehy.condense()
+
+    tag_list = ["SINUSOID"]
+    interval = "1h"
+    filter_expression = ""
     dataserver = server
-    paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(AF.PI.PIPageType.EventCount, 1000)
+    paging_config = AF.PI.PIPagingConfiguration(
+        AF.PI.PIPageType.EventCount, 1000
+    )
 
     taglist = convert_to_TagList(tag_list, dataserver)
 
     # select events on bottem level of condensed hierarchy
     col_start = [
         col_name
-        for col_name in self.df.columns
+        for col_name in condensed.columns
         if col_name.startswith("Starttime")
     ][-1]
     # sort chronologically by starttime
-    self.df.sort_values(by=[col_start], ascending=True, inplace=True)
+    condensed.sort_values(by=[col_start], ascending=True, inplace=True)
 
     print("building continuous extract table from condensed hierachy...")
     # select events on bottem level of condensed hierarchy
     col_event = [
         col_name
-        for col_name in self.df.columns
+        for col_name in condensed.columns
         if col_name.startswith("Event")
     ][-1]
 
-    df_base = self.df[[col_event]].copy()
+    df_base = condensed[[col_event]].copy()
     df_base.columns = ["Event"]
     # add procedure names
     df_base["Procedure"] = df_base["Event"].apply(lambda x: x.top_event)
@@ -51,15 +78,17 @@ with PIconnect.PIAFDatabase(
         endtime = df_proc["Event"].iloc[-1].endtime
         values = list(
             taglist.interpolated_values(
-                starttime, endtime, interval, filter_expression, paging_config=paging_config
+                starttime,
+                endtime,
+                interval,
+                filter_expression,
+                paging_config=paging_config,
             ).to_records(index=True)
         )
         df_cont = pd.concat(
             [
                 df_cont,
-                pd.DataFrame(
-                    [[proc, values]], columns=["Procedure", "Time"]
-                ),
+                pd.DataFrame([[proc, values]], columns=["Procedure", "Time"]),
             ],
             ignore_index=True,
         )
@@ -70,11 +99,11 @@ with PIconnect.PIAFDatabase(
     )  # numpy record to list
     # pd.DataFrame(df['b'].tolist(), index=df.index) instead of
     # apply(pd.Series) could be faster
-    df_cont[["Time"] + [tag.name for tag in taglist]] = df_cont[
-        "Time"
-    ].apply(
+    df_cont[["Time"] + [tag.name for tag in taglist]] = df_cont["Time"].apply(
         pd.Series
     )  # explode list to columns
+
+    df_cont["Time"] = df_cont["Time"].apply(lambda x: add_timezone(x))
 
     # add Event info back
     df_cont["Event"] = np.nan

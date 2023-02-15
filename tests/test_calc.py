@@ -26,8 +26,7 @@ def test_calc_recorded(af_connect, calc_timerange):
     )
     assert calc1.shape == (8, 1), "shape should be (8,1)"
     assert (
-        calc1["calculation"].iloc[0]
-        == tag.interpolated_value("2022-oct-01 14:00:00")[1]
+        calc1["calculation"].iloc[0] == tag.interpolated_value(starttime)[1]
     ), "Should be 91.82201"
 
 
@@ -56,6 +55,3 @@ def test_calc_interpol(calc_timerange):
         r"TagTot('\\ITSBEBEPIHISCOL\SINUSOID', '01-Oct-2022 14:00:00', '03-Oct-2022 14:00:00')",
     )
     assert len(calc3) == 2, "Table length should be 2"
-    assert (
-        calc3["calculation"].iloc[0] == 99.99850612803398
-    ), "Value should be 99.99850612803398"

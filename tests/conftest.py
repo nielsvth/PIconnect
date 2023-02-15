@@ -64,32 +64,32 @@ def af_connect(
 
 @pytest.fixture(scope="package")
 def pi_timerange() -> Tuple[datetime, datetime]:
-    start_date = datetime(day=1, month=1, year=2022).astimezone(
-        timezone("Europe/Brussels")
+    start_date = timezone("Europe/Brussels").localize(
+        datetime(day=1, month=1, year=2022)
     )
-    end_date = datetime(day=10, month=1, year=2022).astimezone(
-        timezone("Europe/Brussels")
+    end_date = timezone("Europe/Brussels").localize(
+        datetime(day=10, month=1, year=2022)
     )
     return (start_date, end_date)
 
 
 @pytest.fixture(scope="package")
 def af_timerange() -> Tuple[datetime, datetime]:
-    start_date = datetime(day=1, month=10, year=2022).astimezone(
-        timezone("Europe/Brussels")
+    start_date = timezone("Europe/Brussels").localize(
+        datetime(day=1, month=10, year=2022)
     )
-    end_date = datetime(day=4, month=10, year=2022).astimezone(
-        timezone("Europe/Brussels")
+    end_date = timezone("Europe/Brussels").localize(
+        datetime(day=4, month=10, year=2022)
     )
     return (start_date, end_date)
 
 
 @pytest.fixture(scope="package")
 def calc_timerange() -> Tuple[datetime, datetime]:
-    start_date = datetime(day=1, month=10, year=2022, hour=14).astimezone(
-        timezone("Europe/Brussels")
+    start_date = timezone("Europe/Brussels").localize(
+        datetime(day=1, month=10, year=2022, hour=14)
     )
-    end_date = datetime(day=1, month=10, year=2022, hour=22).astimezone(
-        timezone("Europe/Brussels")
+    end_date = timezone("Europe/Brussels").localize(
+        datetime(day=1, month=10, year=2022, hour=22)
     )
     return (start_date, end_date)
