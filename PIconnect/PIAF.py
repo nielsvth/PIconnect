@@ -1930,11 +1930,10 @@ class CondensedEventHierarchy:
     CondensedHierarchies"""
 
     def __init__(self, df):
-        self.validate(df)
         self.df = df
+        self.validate()
 
-    @staticmethod
-    def validate(df):
+    def validate(self):
         """Validate input meets requirements for CondensedHierarchy"""
         if not {
             "Event",
@@ -1943,20 +1942,41 @@ class CondensedEventHierarchy:
             "Level",
             "Starttime",
             "Endtime",
-        }.issubset({x.split(" ")[0] for x in df.columns}):
+        }.issubset({x.split(" ")[0] for x in self.df.columns}):
             raise AttributeError(
                 "This dataframe does not have the correct EventHierarchy "
                 + "format"
             )
-        for event in df.columns[
-            df.columns.str.contains(r"Event\s\[.*]", regex=True)
+        for event in self.df.columns[
+            self.df.columns.str.contains(r"Event\s\[.*]", regex=True)
         ]:
-            if not list(df[event].apply(lambda x: type(x)).unique()) == [
+            if set(self.df[event].apply(lambda x: type(x)).unique()) == {
                 Event
-            ]:
+            }:
+                pass
+            elif set(self.df[event].apply(lambda x: type(x)).unique()) == {
+                Event,
+                float,
+            }:
+                print(
+                    "Attention: this CondensedHierarchy contains 'NAN' events, 'NAN' events will be dropped for the method execution"
+                )
+                # drop rows that contain NAN value in any of the Event columns
+                self.df = self.df[
+                    self.df[
+                        self.df.columns[
+                            self.df.columns.str.contains(
+                                r"Event\s\[.*]", regex=True
+                            )
+                        ]
+                    ]
+                    .notnull()
+                    .all(1)
+                ]
+            else:
                 raise AttributeError(
                     "This dataframe does not have the correct "
-                    + "EventHierarchy format"
+                    + "CondensedHierarchy format"
                 )
 
     # Methods

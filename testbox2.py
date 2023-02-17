@@ -88,3 +88,19 @@ with PIconnect.PIAFDatabase(
             timezone("America/New_York")
         )
     )
+
+    import datetime
+
+    taglist1 = server.find_tags("SINUSOID")
+    taglist2 = server.find_tags("SINUSOIDu")
+    taglist = taglist1 + taglist2
+
+    a = datetime.datetime.now()
+
+    x = taglist.interpolated_values(
+        starttime="1-1-2021", endtime="1-1-2023", interval="1m"
+    )
+
+    b = datetime.datetime.now()
+
+    print(b - a)
