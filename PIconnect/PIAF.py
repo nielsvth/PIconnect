@@ -1745,6 +1745,12 @@ class EventHierarchy:
             if tag_list[0] in df.columns:
                 event = df.columns.get_loc("Event")
                 tags = df.columns.get_loc(tag_list[0])
+                # for summary one can define multiple tags in the string
+                if df[tag_list[0]].str.contains(",").any():
+                    raise AttributeError(
+                        "Cell can only contain one Tag at a time"
+                    )
+
                 # extract interpolated data for discrete events
                 df["Time"] = df.apply(
                     lambda row: list(
@@ -1882,12 +1888,16 @@ class EventHierarchy:
             if tag_list[0] in df.columns:
                 event = df.columns.get_loc("Event")
                 tags = df.columns.get_loc(tag_list[0])
+                df[tag_list[0]] = df[tag_list[0]].apply(
+                    lambda x: x.replace(" ", "").split(",")
+                )
+
                 # extract summary data for discrete events
                 df["Time"] = df.apply(
                     lambda row: list(
                         row[event]
                         .summary(
-                            [row[tags]],
+                            row[tags],
                             summary_types,
                             dataserver,
                             calculation_basis,
@@ -2086,6 +2096,8 @@ class CondensedEventHierarchy:
 
             event = df.columns.get_loc("Event")
             tags = df.columns.get_loc("Tags")
+            if df["Tags"].str.contains(",").any():
+                raise AttributeError("Cell can only contain one Tag at a time")
 
             # extract interpolated data for discrete events
             df["Time"] = df.apply(
@@ -2523,6 +2535,9 @@ class CondensedEventHierarchy:
             # add procedure names
             df["Procedure"] = df["Event"].apply(lambda x: x.top_event)
             df = df[["Procedure", "Event", "Tags"]]
+            df["Tags"] = df["Tags"].apply(
+                lambda x: x.replace(" ", "").split(",")
+            )
             df.reset_index(drop=True, inplace=True)
 
             event = df.columns.get_loc("Event")
@@ -2532,7 +2547,7 @@ class CondensedEventHierarchy:
                 lambda row: list(
                     row[event]
                     .summary(
-                        [row[tags]],
+                        row[tags],
                         summary_types,
                         dataserver,
                         calculation_basis,

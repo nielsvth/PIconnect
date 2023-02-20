@@ -17,26 +17,19 @@ with PIconnect.PIAFDatabase(
     eventhierarchy = eventlist.get_event_hierarchy(depth=3)
     # condense
     condensed = eventhierarchy.ehy.condense()
-
-    row = condensed["Event [3]"].dropna()
-
     taglist = server.find_tags("SINUSOID")
 
     a = datetime.datetime.now()
 
-    queue = []
     taglist = taglist
-    interval = "1h"
+    condensed["Tag"] = "SINUSOID, SINUSOIDU"
 
-    for event in row:
-        x = event.summary(
-            tag_list=taglist,
-            summary_types=2 | 4 | 8,
-            dataserver=server,
-        ).to_records(index=False)
-        queue.append(x)
-
-    print(queue)
+    queue = condensed.ecd.summary_extract(
+        tag_list=["Tag"],
+        summary_types=2 | 4 | 8,
+        dataserver=server,
+        col=True,
+    )
 
     b = datetime.datetime.now()
 

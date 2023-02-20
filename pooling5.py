@@ -1,6 +1,8 @@
 import PIconnect
 import datetime
 
+# https://realpython.com/intro-to-python-threading/
+
 # Set up timezone info
 PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
 
@@ -10,7 +12,7 @@ with PIconnect.PIAFDatabase(
 
     eventlist = afdatabase.find_events(
         query="*HR102164G4-*",
-        starttime="*-500d",
+        starttime="*-50d",
         endtime="*-10d",
         search_full_hierarchy=False,
     )
@@ -18,26 +20,19 @@ with PIconnect.PIAFDatabase(
     # condense
     condensed = eventhierarchy.ehy.condense()
 
-    row = condensed["Event [3]"].dropna()
-
-    taglist = server.find_tags("SINUSOID")
+    x = dict(
+        tag_list=["SINUSOID"],
+        summary_types=2 | 4,
+        dataserver=server,
+        col=False,
+    )
 
     a = datetime.datetime.now()
-
-    queue = []
-    taglist = taglist
-    interval = "1h"
-
-    for event in row:
-        x = event.summary(
-            tag_list=taglist,
-            summary_types=2 | 4 | 8,
-            dataserver=server,
-        ).to_records(index=False)
-        queue.append(x)
-
-    print(queue)
-
+    PIconnect.thread.threading(
+        condensed,
+        PIconnect.PIAF.CondensedEventHierarchy.summary_extract,
+        x,
+        100,
+    )
     b = datetime.datetime.now()
-
     print(b - a)

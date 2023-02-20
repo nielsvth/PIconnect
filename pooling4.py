@@ -1,6 +1,9 @@
 from threading import Thread
 import PIconnect
 import datetime
+import pandas as pd
+
+# https://realpython.com/intro-to-python-threading/
 
 # Set up timezone info
 PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
@@ -11,7 +14,7 @@ with PIconnect.PIAFDatabase(
 
     eventlist = afdatabase.find_events(
         query="*HR102164G4-*",
-        starttime="*-500d",
+        starttime="*-200d",
         endtime="*-10d",
         search_full_hierarchy=False,
     )
@@ -27,18 +30,27 @@ with PIconnect.PIAFDatabase(
         arr_range = iter(arr_range)
         return iter(lambda: tuple(islice(arr_range, arr_size)), ())
 
-    lst_chunk = list(chunk(lst, 1000))
+    # split dataframe in chunks
+    lst_chunk = []
+    nr = 100
+    for i in range(1, (len(condensed) // nr) + 2):
+        if i == 0:
+            x = condensed[0 : (i * nr)]
+        else:
+            x = condensed[(i - 1) * nr : (i * nr)]
+        lst_chunk.append(x)
 
     taglist = server.find_tags("SINUSOID")
+
     # try apply
     def extract(row, queue, taglist=taglist):
-        for event in row:
-            x = event.summary(
-                tag_list=taglist,
-                summary_types=2 | 4 | 8,
-                dataserver=server,
-            ).to_records(index=False)
-            queue.append(x)
+        x = row.ecd.summary_extract(
+            tag_list=taglist,
+            summary_types=2 | 4 | 8,
+            dataserver=server,
+            col=False,
+        )
+        queue.append(x)
         return queue
 
     # https://www.linkedin.com/pulse/speed-up-processing-millions-records-database-python-aditya-yogi/
@@ -61,3 +73,5 @@ with PIconnect.PIAFDatabase(
     b = datetime.datetime.now()
 
     print(b - a)
+
+pd.concat(queue).reset_index(drop=True)

@@ -8,6 +8,8 @@ from PIconnect.PI import (
 )
 from PIconnect.time import timestamp_to_index, add_timezone
 
+from PIconnect.PIConsts import TimestampCalculation, CalculationBasis
+
 # Set up timezone info
 PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
 
@@ -37,85 +39,117 @@ with PIconnect.PIAFDatabase(
     # create condensed dataframe
     condensed = eventhierarchy.ehy.condense()
 
-    tag_list = ["SINUSOID"]
-    interval = "1h"
+    condensed["Tag"] = "SINUSOID, SINUSOIDU"
+
+    # do summary construction
+    tag_list = ["Tag"]
+    summary_types = 2 | 4 | 8
     filter_expression = ""
     dataserver = server
+    time_type = TimestampCalculation.AUTO
+    calculation_basis = CalculationBasis.TIME_WEIGHTED
+    col = True
     paging_config = AF.PI.PIPagingConfiguration(
         AF.PI.PIPageType.EventCount, 1000
     )
 
-    taglist = convert_to_TagList(tag_list, dataserver)
+    print("building summary table from condensed hierachy...")
+    df = condensed.copy()
 
-    # select events on bottem level of condensed hierarchy
-    col_start = [
-        col_name
-        for col_name in condensed.columns
-        if col_name.startswith("Starttime")
-    ][-1]
-    # sort chronologically by starttime
-    condensed.sort_values(by=[col_start], ascending=True, inplace=True)
-
-    print("building continuous extract table from condensed hierachy...")
-    # select events on bottem level of condensed hierarchy
+    # select events on bottom level of condensed hierarchy
     col_event = [
-        col_name
-        for col_name in condensed.columns
-        if col_name.startswith("Event")
+        col_name for col_name in df.columns if col_name.startswith("Event")
     ][-1]
 
-    df_base = condensed[[col_event]].copy()
-    df_base.columns = ["Event"]
-    # add procedure names
-    df_base["Procedure"] = df_base["Event"].apply(lambda x: x.top_event)
-    df_base = df_base[["Procedure", "Event"]]
-    df_base.reset_index(drop=True, inplace=True)
-
-    # extract interpolated data for continuous events, per procedure
-    df_cont = pd.DataFrame()
-    for proc, df_proc in df_base.groupby("Procedure"):
-        starttime = df_proc["Event"].iloc[0].starttime
-        endtime = df_proc["Event"].iloc[-1].endtime
-        values = list(
-            taglist.interpolated_values(
-                starttime,
-                endtime,
-                interval,
-                filter_expression,
-                paging_config=paging_config,
-            ).to_records(index=True)
+    # performance checks
+    maxi = max(df[col_event].apply(lambda x: x.duration))
+    if maxi > pd.Timedelta("60 days"):
+        print(
+            f"Large Event(s) with duration up to {maxi} detected, "
+            + "Note that this might take some time..."
         )
-        df_cont = pd.concat(
-            [
-                df_cont,
-                pd.DataFrame([[proc, values]], columns=["Procedure", "Time"]),
-            ],
-            ignore_index=True,
+    if len(df) > 50:
+        print(
+            f"Summaries will be calculated for {len(df)} Events, Note"
+            + " that this might take some time..."
         )
 
-    df_cont = df_cont.explode("Time")  # explode list to rows
-    df_cont["Time"] = df_cont["Time"].apply(
+    # based on list of tags
+    if not col:
+        df = df[[col_event]].copy()
+        df.columns = ["Event"]
+
+        # add procedure names
+        df["Procedure"] = df["Event"].apply(lambda x: x.top_event)
+        df = df[["Procedure", "Event"]]
+        df.reset_index(drop=True, inplace=True)
+
+        taglist = convert_to_TagList(tag_list, dataserver)
+        # extract summary data for discrete events
+        df["Time"] = df["Event"].apply(
+            lambda x: list(
+                x.summary(
+                    taglist,
+                    summary_types,
+                    calculation_basis,
+                    time_type,
+                    paging_config=paging_config,
+                ).to_records(index=False)
+            )
+        )
+
+    # based on column with tags
+    if col:
+        if len(tag_list) > 1:
+            raise AttributeError(
+                f"You can only specify a single tag column at a time"
+            )
+        if tag_list[0] in df.columns:
+            df = df[[col_event, tag_list[0]]].copy()
+            df.columns = ["Event", "Tags"]
+        else:
+            raise AttributeError(
+                f"The column option was set to True, but {tag_list} is "
+                + "not a valid column"
+            )
+
+        # add procedure names
+        df["Procedure"] = df["Event"].apply(lambda x: x.top_event)
+        df = df[["Procedure", "Event", "Tags"]]
+        df["Tags"] = df["Tags"].apply(lambda x: x.replace(" ", "").split(","))
+        df.reset_index(drop=True, inplace=True)
+
+        event = df.columns.get_loc("Event")
+        tags = df.columns.get_loc("Tags")
+
+        a = datetime.now()
+
+        # extract summary data for discrete events
+        df["Time"] = df.apply(
+            lambda row: list(
+                row[event]
+                .summary(
+                    row[tags],
+                    summary_types,
+                    dataserver,
+                    calculation_basis,
+                    time_type,
+                    paging_config=paging_config,
+                )
+                .to_records(index=False)
+            ),
+            axis=1,
+        )
+
+    df = df.explode("Time")  # explode list to rows
+    df["Time"] = df["Time"].apply(
         lambda x: [el for el in x]
     )  # numpy record to list
-    # pd.DataFrame(df['b'].tolist(), index=df.index) instead of
-    # apply(pd.Series) could be faster
-    df_cont[["Time"] + [tag.name for tag in taglist]] = df_cont["Time"].apply(
+    df[["Tag", "Summary", "Value", "Time"]] = df["Time"].apply(
         pd.Series
     )  # explode list to columns
+    df.reset_index(drop=True, inplace=True)
 
-    df_cont["Time"] = df_cont["Time"].apply(lambda x: add_timezone(x))
+    b = datetime.now()
 
-    # add Event info back
-    df_cont["Event"] = np.nan
-    for event in df_base["Event"]:
-        df_cont["Event"].loc[
-            (df_cont["Time"] >= event.starttime)
-            & (df_cont["Time"] <= event.endtime)
-        ] = event
-
-    # format
-    df_cont = df_cont[
-        ["Procedure", "Event", "Time"] + [tag.name for tag in taglist]
-    ]
-    df_cont.sort_values(by=["Time"], ascending=True, inplace=True)
-    df_cont.reset_index(drop=True, inplace=True)
+    print(b - a)
