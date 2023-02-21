@@ -9,6 +9,11 @@ from PIconnect.time import (
     timestamp_to_index,
     to_af_time_range,
 )
+from PIconnect.PIConsts import (
+    SummaryType,
+    CalculationBasis,
+    TimestampCalculation,
+    ExpressionSampleType,)
 
 import pandas as pd
 
@@ -75,3 +80,44 @@ def calc_interpolated(
         df = pd.DataFrame()
 
     return df
+
+
+def calc_summary(
+    starttime: Union[str, datetime.datetime],
+    endtime: Union[str, datetime.datetime],
+    interval: str,
+    summary_types: int,
+    expression: str = "",
+    calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
+    time_type: TimestampCalculation = TimestampCalculation.AUTO,
+    AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.EXPRESSION_RECORDED_VALUES,
+    filter_interval: str = None,) -> pd.DataFrame:
+    
+    AFrange = to_af_time_range(starttime, endtime)
+    AFinterval = AF.Time.AFTimeSpan.Parse(interval)
+    AFfilter_interval = AF.Time.AFTimeSpan.Parse(filter_interval)
+
+    result = AF.Data.AFCalculation.CalculateSummaries(
+        0,
+        expression,
+        AFrange,
+        AFinterval,
+        summary_types,
+        calculation_basis,
+        AFfilter_evaluation,
+        AFfilter_interval,
+        time_type,
+    )
+
+    df_final = pd.DataFrame()
+    for x in result:  # per summary
+        summary = SummaryType(x.Key).name
+        values = [
+            (timestamp_to_index(value.Timestamp.UtcTime), value.Value)
+            for value in x.Value
+        ]
+        df = pd.DataFrame(values, columns=["Timestamp", "Value"])
+        df["Summary"] = summary
+        df_final = pd.concat([df_final, df], ignore_index=True)
+
+    return df_final[["Summary", "Value", "Timestamp",]]

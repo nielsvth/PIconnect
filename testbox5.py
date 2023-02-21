@@ -14,48 +14,32 @@ from PIconnect.PIConsts import TimestampCalculation, CalculationBasis
 PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
 
 with PIconnect.PIAFDatabase(
-    server="ITSBEBEWSP06182 DEV", database="NuGreen"
-) as afdatabase, PIconnect.PIServer() as server:
-
-    starttime = datetime(day=1, month=10, year=2022)
-    endtime = datetime(day=4, month=10, year=2022)
+    server="PIMS_EU_BEERSE_AF_PE", database="DeltaV-Events"
+) as afdatabase, PIconnect.PIServer(server="ITSBEBEPIHISCOL") as server:
 
     eventlist = afdatabase.find_events(
-        query="*", starttime=starttime, endtime=endtime
-    )
-    eventhierarchy = eventlist.get_event_hierarchy(depth=2)
-
-    # add attributes
-    eventhierarchy = eventhierarchy.ehy.add_attributes(
-        attribute_names_list=["Equipment", "Manufacturer"],
-        template_name="Unit_template",
+        query="*HR102164G4-*",
+        starttime="*-100d",
+        endtime="*-10d",
+        search_full_hierarchy=False,
     )
 
-    # add referenced elements
-    eventhierarchy = eventhierarchy.ehy.add_ref_elements(
-        template_name="Operation_template"
-    )
+# pick one event
+event = eventlist[1]
+eventhierarchy = event.get_event_hierarchy(depth=1)
+eventhierarchy = eventhierarchy.ehy.add_ref_elements(
+    template_name="UnitProcedure"
+)
 
-    eventhierarchy["Tag"] = "SINUSOID, SINUSOIDU"
+print(event.name)
+print(event.starttime)
+print(event.endtime)
 
-    # create condensed dataframe
-    # condensed = eventhierarchy.ehy.condense()
-    # condensed['Tag'] = "SINUSOID, SINUSOIDU"
-
-    # do summary construction
-    tag_list = ["Tag"]
-    interval = "1h"
-    filter_expression = ""
-    dataserver = server
-    col = True
-    paging_config = AF.PI.PIPagingConfiguration(
-        AF.PI.PIPageType.EventCount, 1000
-    )
-
-    # summary extract - specify tag from list
-    summary_values = eventhierarchy.ehy.summary_extract(
-        tag_list=["Tag"],
-        summary_types=4 | 8 | 32,
-        dataserver=server,
-        col=True,
-    )
+# calculation on interpolated values
+# returns substracted values of TT08 and TT09 for R015
+calc = PIconnect.calc.calc_interpolated(
+    event.starttime,
+    event.endtime,
+    "1h",
+    r"('\\ITSBEBEPIHISCOL\100_091_R015_TT08')-('\\ITSBEBEPIHISCOL\100_091_R015_TT09')",
+)
