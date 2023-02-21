@@ -7,6 +7,7 @@ from PIconnect.config import PIConfig
 from PIconnect.PI import PIServer
 from PIconnect.PIAF import PIAFDatabase
 import PIconnect.calc
+import PIconnect.thread
 
 # pragma pylint: enable=unused-import
 

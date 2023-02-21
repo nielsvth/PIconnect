@@ -1887,19 +1887,25 @@ class EventHierarchy:
                 )
             if tag_list[0] in df.columns:
                 event = df.columns.get_loc("Event")
-                tags = df.columns.get_loc(tag_list[0])
-                df[tag_list[0]] = df[tag_list[0]].apply(
-                    lambda x: x.replace(" ", "").split(",")
-                )
+
+                df.reset_index(drop=True, inplace=True)
+                # just single request for each unique target
+                for tg in df[tag_list[0]].unique():
+                    tl = convert_to_TagList(
+                        tg.replace(" ", "").split(","), dataserver
+                    )
+                    # https://stackoverflow.com/questions/39717809/insert-list-into-cells-which-meet-column-conditions
+                    df.loc[df[tag_list[0]] == tg, "Tags"] = pd.Series(
+                        [tl] * df.shape[0]
+                    )
 
                 # extract summary data for discrete events
                 df["Time"] = df.apply(
                     lambda row: list(
                         row[event]
                         .summary(
-                            row[tags],
+                            row["Tags"],
                             summary_types,
-                            dataserver,
                             calculation_basis,
                             time_type,
                             paging_config=paging_config,
@@ -2504,6 +2510,7 @@ class CondensedEventHierarchy:
             df.reset_index(drop=True, inplace=True)
 
             taglist = convert_to_TagList(tag_list, dataserver)
+
             # extract summary data for discrete events
             df["Time"] = df["Event"].apply(
                 lambda x: list(
@@ -2525,7 +2532,7 @@ class CondensedEventHierarchy:
                 )
             if tag_list[0] in self.df.columns:
                 df = self.df[[col_event, tag_list[0]]].copy()
-                df.columns = ["Event", "Tags"]
+                df.columns = ["Event", "Tags_in"]
             else:
                 raise AttributeError(
                     f"The column option was set to True, but {tag_list} is "
@@ -2534,11 +2541,19 @@ class CondensedEventHierarchy:
 
             # add procedure names
             df["Procedure"] = df["Event"].apply(lambda x: x.top_event)
-            df = df[["Procedure", "Event", "Tags"]]
-            df["Tags"] = df["Tags"].apply(
-                lambda x: x.replace(" ", "").split(",")
-            )
+            df = df[["Procedure", "Event", "Tags_in"]]
             df.reset_index(drop=True, inplace=True)
+
+            # just single request for each unique target
+            for tg in df["Tags_in"].unique():
+                tl = convert_to_TagList(
+                    tg.replace(" ", "").split(","), dataserver
+                )
+                # https://stackoverflow.com/questions/39717809/insert-list-into-cells-which-meet-column-conditions
+                df.loc[df["Tags_in"] == tg, "Tags"] = pd.Series(
+                    [tl] * df.shape[0]
+                )
+            df.drop(columns="Tags_in", inplace=True)
 
             event = df.columns.get_loc("Event")
             tags = df.columns.get_loc("Tags")
@@ -2549,7 +2564,6 @@ class CondensedEventHierarchy:
                     .summary(
                         row[tags],
                         summary_types,
-                        dataserver,
                         calculation_basis,
                         time_type,
                         paging_config=paging_config,

@@ -1,6 +1,7 @@
 import PIconnect
 import datetime
 
+
 # https://realpython.com/intro-to-python-threading/
 
 # Set up timezone info
@@ -12,27 +13,31 @@ with PIconnect.PIAFDatabase(
 
     eventlist = afdatabase.find_events(
         query="*HR102164G4-*",
-        starttime="*-50d",
+        starttime="*-100d",
         endtime="*-10d",
         search_full_hierarchy=False,
     )
     eventhierarchy = eventlist.get_event_hierarchy(depth=3)
-    # condense
     condensed = eventhierarchy.ehy.condense()
 
+    # multiple tags at te same time can be defined now, but needs to be as csv string
+    condensed["Tag"] = "SINUSOID, SINUSOIDU"
+
     x = dict(
-        tag_list=["SINUSOID"],
+        tag_list=["Tag"],
         summary_types=2 | 4,
         dataserver=server,
-        col=False,
+        col=True,
     )
 
     a = datetime.datetime.now()
-    PIconnect.thread.threading(
+
+    res = PIconnect.thread.threading(
         condensed,
         PIconnect.PIAF.CondensedEventHierarchy.summary_extract,
         x,
         100,
     )
+
     b = datetime.datetime.now()
     print(b - a)

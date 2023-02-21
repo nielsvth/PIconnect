@@ -67,41 +67,58 @@ def threading(
     chunk_size: int = 1000,
 ):
     """Threading function for increased performance by splitting source data in multiple chunks
-    and executing queries for chunks in parallal. 
+    and executing queries for chunks in parallal.
 
     Args:
-        source (pd.DataFrame, list, PIconnect.PI.TagList): input for threading
+        source (pd.DataFrame, list, PIconnect.PI.TagList): input for threading, available for
+        EventHierarchy, CondensedEventHierarchy and TagList classes
         method (function): PIConnect method,
         args (dict): dictionary with method arguments
         chunk_size(int): size of each chunk, default is 1000
-    
-    Returns pd.DataFrame 
+
+    Returns pd.DataFrame
     """
 
     if "CondensedEventHierarchy" in str(method.__qualname__):
         # split df in smaller chunks for I/O bound threading
         lst_chunk = chunk(source, chunk_size)
         typ = "ecd"
+        if not (
+            method == PIconnect.PIAF.CondensedEventHierarchy.summary_extract
+        ) and not (
+            method
+            == PIconnect.PIAF.CondensedEventHierarchy.interpol_discrete_extract
+        ):
+            raise AttributeError(
+                "Threading only works for summary_extract and interpol_discrete_extract methods"
+            )
 
     elif "EventHierarchy" in str(method.__qualname__):
         # split df in smaller chunks for I/O bound threading
         lst_chunk = chunk(source, chunk_size)
         typ = "ehy"
-    elif ("Tag" in str(method.__qualname__)) or (
-        "TagList" in str(method.__qualname__)
-    ):
+        if not (
+            method == PIconnect.PIAF.EventHierarchy.summary_extract
+        ) and not (
+            method == PIconnect.PIAF.EventHierarchy.interpol_discrete_extract
+        ):
+            raise AttributeError(
+                "Threading only works for summary_extract and interpol_discrete_extract methods"
+            )
+
+    elif "TagList" in str(method.__qualname__):
         # split tag list in smaller chunks for I/O bound threading
         typ = "tag"
 
     else:
-        print(
+        raise AttributeError(
             f"The {method} method currently has no threading functionality available"
         )
 
     thread_list = []
     queue = []
 
-    if (typ == "ecd") or (type == "ehy") or (type == "tag"):
+    if (typ == "ecd") or (typ == "ehy") or (typ == "tag"):
         for i in range(len(lst_chunk)):
             t = Thread(
                 target=source_extract,
