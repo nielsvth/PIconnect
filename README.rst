@@ -332,6 +332,16 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
         col=False,
     )
     
+    # Return dataframe of summary data for for calculated values over specified intervals per event
+    # interval is set to 100h. As long as interval is bigger than the event duration, 
+    # only one value is calculated for each summary over this event
+    calc_summary_values = eventhierarchy.ehy.calc_summary_extract(
+        interval="100h",
+        summary_types=4 | 8,
+        expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
+        col = False
+    )
+    
     
 8. CondensedEventHierarchy
 *******************************************************
@@ -403,7 +413,17 @@ The CondensedEventHierarchy object provides a dataframe-like representation of t
         summary_types=2 | 4 | 8,
         dataserver=server,
     )
-   
+    
+    # Return dataframe of summary data for for calculated values over specified intervals per bottom level event
+    # interval is set to 100h. As long as interval is bigger than the event duration, 
+    # only one value is calculated for each summary over this event
+    calc_summary_values = condensed.ecd.calc_summary_extract(
+        interval="100h",
+        summary_types=4 | 8,
+        expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
+        col = False
+    )
+
 
 9. Tag
 *******************************************************
@@ -603,9 +623,10 @@ Core functionality for doing advanced calculations and filtering
 
 .. code-block:: python
 
-    # find 'SINUSOID' tag
-    tag = server.find_tags("SINUSOID")[0]
-
+    # with '\\ITSBEBEPIHISCOL' as PIServer
+    # Tags's full path need to be specified in the expression argument
+    # expression argument needs to be passed as raw string (r"")
+    
     # calculation on recorded values
     # for overview of expression syntax: https://docs.aveva.com/bundle/pi-server-af-analytics/page/1021946.html
     calc1 = PIconnect.calc.calc_recorded(
@@ -622,9 +643,59 @@ Core functionality for doing advanced calculations and filtering
         "1h",
         r"TagTot('\\ITSBEBEPIHISCOL\SINUSOID', '01-Oct-2022 14:00:00', '03-Oct-2022 14:00:00')",
     )
+    
+    # calculation of summary measures of interval for calculated values
+    # interval is set to 100h. As long as interval is bigger than the event duration, 
+    # only one value is calculated for each summary over this event. 
+    calc3 = PIconnect.calc.calc_summary(
+        starttime = "1-10-2022 14:00",
+        endtime = "1-10-2022 22:00",
+        interval='100h',
+        summary_types= 4|8,
+        expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
+    )
 
 
-13.  Attribute & Method Overview
+13. Threading
+*******************************************************
+
+Core functionality for doing I/O threading: requests will be split up in chunks of defined size and run in parallel, thereby increasing performance.
+
+Threading is currently available for:
+
+- PIconnect.PIAF.EventHierarchy.summary_extract
+- PIconnect.PIAF.EventHierarchy.calc_summary_extract
+- PIconnect.PIAF.EventHierarchy.interpol_discrete_extract
+
+- PIconnect.PIAF.CondensedEventHierarchy.summary_extract
+- PIconnect.PIAF.CondensedEventHierarchy.calc_summary_extract
+- PIconnect.PIAF.CondensedEventHierarchy.interpol_discrete_extract
+
+- All Taglist methods
+
+.. code-block:: python
+   
+    #get a condensed hierarchy
+    condensed = eventhierarchy.ehy.condense()
+
+    #pass arguments as a dict
+    x = dict(
+        tag_list=["SINUSOID, SINUSOIDU"],
+        summary_types=2 | 4,
+        dataserver=server,
+        col=False,
+    )
+
+    #initialize the threading function by providing source, appropriate class method, args dict and chunk_size
+    res = PIconnect.thread.threading(
+        source = condensed,
+        methoud = PIconnect.PIAF.CondensedEventHierarchy.summary_extract,
+        args = x,
+        chunk_size = 1000,
+        )
+
+    
+14.  Attribute & Method Overview
 *******************************************************
 
 .. csv-table:: PIServer
@@ -782,6 +853,8 @@ Core functionality for doing advanced calculations and filtering
    (tag_list, interval, filter_expression='', dataserver=None, col=False)", "*Method*", "Return dataframe of interpolated data for discrete events of EventHierarchy, for the tag(s) specified"
    "**.ehy.summary_extract**
    (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, col=False)", "*Method*", "Return dataframe of summary measures for discrete events of EventHierarchy, for the tag(s) specified"
+   "**.ehy.calc_summary_extract** 
+   (interval, summary_types, expression, calculation_basis, time_type, AFfilter_evaluation, filter_interval)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the interval for each event in the Hierarchy. Expression argument need to be entered as raw strings: r'expression'."
    
    
 .. csv-table:: CondensedEventHierarchy
@@ -798,6 +871,8 @@ Core functionality for doing advanced calculations and filtering
    (tag_list, nr_of_intervals, dataserver=None)", "*Method*", "Return nested dictionary (level 1: Procedures, Level 2: Tags) of continuous plot values from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy. Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and at most one exceptional point (bad status or digital state)"
    "**.ecd.summary_extract**
    (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, col=False)", "*Method*", "Return dataframe of summary values for events on bottom level of condensed hierarchy"
+    "**.ecd.calc_summary_extract** 
+   (interval, summary_types, expression, calculation_basis, time_type, AFfilter_evaluation, filter_interval)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the interval for each event at bottom level of the CondensedHierarchy. Expression argument need to be entered as raw strings: r'expression'."
 
 
 .. csv-table:: Asset
@@ -868,12 +943,14 @@ Core functionality for doing advanced calculations and filtering
    :widths: 30, 15, 50 
 
    "**PIconnect.calc.calc_recorded**
-   (starttime, endtime, expression=r"")", "*Method*", "Returns dataframe that contains the result of evaluating the passed expression at each point in time over the passed time range where a recorded value exists for a member of the expression. Expression arguments need to be entered as raw strings: r'expression'"
+   (starttime, endtime, expression=r"")", "*Method*", "Returns dataframe that contains the result of evaluating the passed expression at each point in time over the passed time range where a recorded value exists for a member of the expression. Expression argument need to be entered as raw strings: r'expression'"
     "**PIconnect.calc.calc_interpolated**
-   (starttime, endtime, interval, expression=r"")", "*Method*", "Returns dataframe that contains the result of evaluating the passed expression over the passed time range at a defined interval. Expression arguments need to be entered as raw strings: r'expression'."
+   (starttime, endtime, interval, expression=r"")", "*Method*", "Returns dataframe that contains the result of evaluating the passed expression over the passed time range at a defined interval. Expression argument need to be entered as raw strings: r'expression'."
+   "**calc.calc_summary**
+   (starttime, endtime, interval, summary_types, expression, calculation_basis, time_type, AFfilter_evaluation, filter_interval)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the specified duration and interval. Expression argument need to be entered as raw strings: r'expression'."
 
 
-14.    PIConstants
+15.    PIConstants
 *******************************************************
 PIConstants provides a defined set of arguments that can be passed to some of the class methods specified above to modify their behaviour. 
 They are imported from the PIConsts module and used as illustrated in the example below. 
