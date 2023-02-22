@@ -88,22 +88,29 @@ def threading(
         ) and not (
             method
             == PIconnect.PIAF.CondensedEventHierarchy.interpol_discrete_extract
+        ) and not (
+            method == PIconnect.PIAF.CondensedEventHierarchy.calc_summary_extract
         ):
             raise AttributeError(
-                "Threading only works for summary_extract and interpol_discrete_extract methods"
+                "Threading only works for summary_extract, calc_summary_extract and interpol_discrete_extract methods"
             )
 
     elif "EventHierarchy" in str(method.__qualname__):
         # split df in smaller chunks for I/O bound threading
         lst_chunk = chunk(source, chunk_size)
         typ = "ehy"
-        if not (
-            method == PIconnect.PIAF.EventHierarchy.summary_extract
-        ) and not (
-            method == PIconnect.PIAF.EventHierarchy.interpol_discrete_extract
+        if (
+            not (method == PIconnect.PIAF.EventHierarchy.summary_extract)
+            and not (
+                method
+                == PIconnect.PIAF.EventHierarchy.interpol_discrete_extract
+            )
+            and not (
+                method == PIconnect.PIAF.EventHierarchy.calc_summary_extract
+            )
         ):
             raise AttributeError(
-                "Threading only works for summary_extract and interpol_discrete_extract methods"
+                "Threading only works for summary_extract, calc_summary_extract and interpol_discrete_extract methods"
             )
 
     elif "TagList" in str(method.__qualname__):

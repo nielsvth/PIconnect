@@ -49,6 +49,7 @@ from warnings import warn
 
 from PIconnect._utils import classproperty
 from PIconnect.AFSDK import AF
+from PIconnect.calc import calc_summary
 from PIconnect.time import to_af_time
 from PIconnect.PIConsts import (
     EventFrameSearchMode,
@@ -1848,7 +1849,7 @@ class EventHierarchy:
         Returns:
             pd.DataFrame: dataframe of summary measures
         """
-        print("Building summary table from EventHierachy...")
+        print("Building summary table from EventHierarchy...")
         df = self.df.copy()
 
         # performance checks
@@ -1925,6 +1926,147 @@ class EventHierarchy:
             lambda x: [el for el in x] if not pd.isnull(x) else np.nan
         )  # numpy record to list
         df[["Tag", "Summary", "Value", "Time"]] = df["Time"].apply(
+            pd.Series
+        )  # explode list to columns
+        df.reset_index(drop=True, inplace=True)
+
+        return df
+
+    def calc_summary_extract(
+        self,
+        interval: str,
+        summary_types: int,
+        expression: str = "",
+        calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
+        time_type: TimestampCalculation = TimestampCalculation.AUTO,
+        AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.EXPRESSION_RECORDED_VALUES,
+        filter_interval: str = None,
+        col: bool = False,
+    ) -> pd.DataFrame:
+
+        """Return dataframe of summary measures of calculations specified in expression,
+        for discrete events of EventHierarchy.
+
+        Args:
+            interval (str): The bounding time for the evaluation period.
+            summary_types (int): integers separated by '|'. List given
+                below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+
+                - TOTAL = 1: A total over the time span
+                - AVERAGE = 2: Average value over the time span
+                - MINIMUM = 4: The minimum value in the time span
+                - MAXIMUM = 8: The maximum value in the time span
+                - RANGE = 16: The range of the values (max-min) in the time
+                    span
+                - STD_DEV = 32 : The sample standard deviation of the values
+                    over the time span
+                - POP_STD_DEV = 64: The population standard deviation of the
+                    values over the time span
+                - COUNT = 128: The sum of the event count (when the
+                    calculation is event weighted). The sum of the event time
+                        duration (when the calculation is time weighted.)
+                - PERCENT_GOOD = 8192: The percentage of the data with a good
+                    value over the time range. Based on time for time weighted
+                        calculations, based on event count for event weigthed
+                        calculations.
+                - TOTAL_WITH_UOM = 16384: The total over the time span, with
+                    the unit of measurement that's associated with the input
+                    (or no units if not defined for the input)
+                - ALL = 24831: A convenience to retrieve all summary types
+                - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
+                    summary types for non-numeric data
+
+            expression (raw string): A string containing the expression to be evaluated.
+                The syntax for the expression generally follows the
+                Performance Equation syntax as described in
+                the PI Data Archive documentation.
+            calculation_basis (CalculationBasis, optional): Basis by which to
+                calculate the summary statistic.
+                Defaults to CalculationBasis.TIME_WEIGHTED.
+            time_type (TimestampCalculation, optional): How the timestamp is
+                calculated. Defaults to TimestampCalculation.AUTO.
+            AFfilter_evaluation (ExpressionSampleType, optional): Expression
+                Type. Defaults to
+                ExpressionSampleType.EXPRESSION_RECORDED_VALUES.
+            col (bool, optional): Parameter to toggle the column functionality.
+                When set to True on can pass a column name trough the 'expression' argument.
+                Expressions wil be evaluated on a row-to-row basis based on column value.
+                Defaults to False.
+
+        Returns:
+            pd.DataFrame: dataframe of summary measures
+        """
+        print("Building calcultion summary table from EventHierarchy...")
+        df = self.df.copy()
+
+        # performance checks
+        maxi = max(df["Event"].apply(lambda x: x.duration))
+        if maxi > pd.Timedelta("60 days"):
+            print(
+                f"Large Event(s) with duration up to {maxi} detected, "
+                + "Note that this might the collection limit..."
+            )
+        if len(df) > 50:
+            print(
+                f"Summaries will be calculated for {len(df)} Events, Note"
+                + " that this might take some time..."
+            )
+
+        if not col:
+            # extract summary data for discrete events
+            df["Time"] = df["Event"].apply(
+                lambda x: list(
+                    calc_summary(
+                        starttime=x.starttime,
+                        endtime=x.endtime,
+                        interval=interval,
+                        summary_types=summary_types,
+                        expression=expression,
+                        calculation_basis=calculation_basis,
+                        time_type=time_type,
+                        AFfilter_evaluation=AFfilter_evaluation,
+                        filter_interval=filter_interval,
+                    ).to_records(index=False)
+                )
+            )
+
+        if col:
+            if not type(expression) == str:
+                raise AttributeError(
+                    "Name of expression column should be of string type"
+                )
+            if expression in df.columns:
+                event = df.columns.get_loc("Event")
+                df.reset_index(drop=True, inplace=True)
+
+                # extract summary data for discrete events
+                df["Time"] = df.apply(
+                    lambda row: list(
+                        calc_summary(
+                            starttime=row[event].starttime,
+                            endtime=row[event].endtime,
+                            interval=interval,
+                            summary_types=summary_types,
+                            expression=row[expression],
+                            calculation_basis=calculation_basis,
+                            time_type=time_type,
+                            AFfilter_evaluation=AFfilter_evaluation,
+                            filter_interval=filter_interval,
+                        ).to_records(index=False)
+                    ),
+                    axis=1,
+                )
+            else:
+                raise AttributeError(
+                    f"The column option was set to True, but {expression} "
+                    + "is not a valid column name"
+                )
+
+        df = df.explode("Time")  # explode list to rows
+        df["Time"] = df["Time"].apply(
+            lambda x: [el for el in x] if not pd.isnull(x) else np.nan
+        )  # numpy record to list
+        df[["Summary", "Value", "Time"]] = df["Time"].apply(
             pd.Series
         )  # explode list to columns
         df.reset_index(drop=True, inplace=True)
@@ -2476,7 +2618,7 @@ class CondensedEventHierarchy:
             pd.DataFrame: Resultant dataframe
         """
 
-        print("building summary table from condensed hierachy...")
+        print("building summary table from condensed hierarchy...")
         df = self.df.copy()
 
         # select events on bottom level of condensed hierarchy
@@ -2536,7 +2678,7 @@ class CondensedEventHierarchy:
             else:
                 raise AttributeError(
                     f"The column option was set to True, but {tag_list} is "
-                    + "not a valid column"
+                    + "not a valid column name"
                 )
 
             # add procedure names
@@ -2578,6 +2720,171 @@ class CondensedEventHierarchy:
             lambda x: [el for el in x]
         )  # numpy record to list
         df[["Tag", "Summary", "Value", "Time"]] = df["Time"].apply(
+            pd.Series
+        )  # explode list to columns
+        df.reset_index(drop=True, inplace=True)
+
+        return df
+
+    def calc_summary_extract(
+        self,
+        interval: str,
+        summary_types: int,
+        expression: str = "",
+        calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
+        time_type: TimestampCalculation = TimestampCalculation.AUTO,
+        AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.EXPRESSION_RECORDED_VALUES,
+        filter_interval: str = None,
+        col: bool = False,
+    ) -> pd.DataFrame:
+
+        """Return dataframe of summary measures of calculations specified in expression,
+        for discrete events at bottom level of the CondensedHierarchy.
+
+        Args:
+            interval (str): The bounding time for the evaluation period.
+            summary_types (int): integers separated by '|'. List given
+                below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+
+                - TOTAL = 1: A total over the time span
+                - AVERAGE = 2: Average value over the time span
+                - MINIMUM = 4: The minimum value in the time span
+                - MAXIMUM = 8: The maximum value in the time span
+                - RANGE = 16: The range of the values (max-min) in the time
+                    span
+                - STD_DEV = 32 : The sample standard deviation of the values
+                    over the time span
+                - POP_STD_DEV = 64: The population standard deviation of the
+                    values over the time span
+                - COUNT = 128: The sum of the event count (when the
+                    calculation is event weighted). The sum of the event time
+                        duration (when the calculation is time weighted.)
+                - PERCENT_GOOD = 8192: The percentage of the data with a good
+                    value over the time range. Based on time for time weighted
+                        calculations, based on event count for event weigthed
+                        calculations.
+                - TOTAL_WITH_UOM = 16384: The total over the time span, with
+                    the unit of measurement that's associated with the input
+                    (or no units if not defined for the input)
+                - ALL = 24831: A convenience to retrieve all summary types
+                - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
+                    summary types for non-numeric data
+
+            expression (raw string): A string containing the expression to be evaluated.
+                The syntax for the expression generally follows the
+                Performance Equation syntax as described in
+                the PI Data Archive documentation.
+            calculation_basis (CalculationBasis, optional): Basis by which to
+                calculate the summary statistic.
+                Defaults to CalculationBasis.TIME_WEIGHTED.
+            time_type (TimestampCalculation, optional): How the timestamp is
+                calculated. Defaults to TimestampCalculation.AUTO.
+            AFfilter_evaluation (ExpressionSampleType, optional): Expression
+                Type. Defaults to
+                ExpressionSampleType.EXPRESSION_RECORDED_VALUES.
+            col (bool, optional): Parameter to toggle the column functionality.
+                When set to True on can pass a column name trough the 'expression' argument.
+                Expressions wil be evaluated on a row-to-row basis based on column value.
+                Defaults to False.
+
+        Returns:
+            pd.DataFrame: dataframe of summary measures
+        """
+        print("building calculation summary table from condensed hierarchy...")
+        df = self.df.copy()
+
+        # select events on bottom level of condensed hierarchy
+        col_event = [
+            col_name
+            for col_name in self.df.columns
+            if col_name.startswith("Event")
+        ][-1]
+
+        # performance checks
+        maxi = max(df[col_event].apply(lambda x: x.duration))
+        if maxi > pd.Timedelta("60 days"):
+            print(
+                f"Large Event(s) with duration up to {maxi} detected, "
+                + "Note that this might trigger the collection limit..."
+            )
+        if len(df) > 50:
+            print(
+                f"Summaries will be calculated for {len(df)} Events, Note"
+                + " that this might take some time..."
+            )
+
+        if not col:
+            df = self.df[[col_event]].copy()
+            df.columns = ["Event"]
+
+            # add procedure names
+            df["Procedure"] = df["Event"].apply(lambda x: x.top_event)
+            df = df[["Procedure", "Event"]]
+            df.reset_index(drop=True, inplace=True)
+
+            # extract summary data for discrete events
+            df["Time"] = df["Event"].apply(
+                lambda x: list(
+                    calc_summary(
+                        starttime=x.starttime,
+                        endtime=x.endtime,
+                        interval=interval,
+                        summary_types=summary_types,
+                        expression=expression,
+                        calculation_basis=calculation_basis,
+                        time_type=time_type,
+                        AFfilter_evaluation=AFfilter_evaluation,
+                        filter_interval=filter_interval,
+                    ).to_records(index=False)
+                )
+            )
+
+        if col:
+            if not type(expression) == str:
+                raise AttributeError(
+                    "Name of expression column should be of string type"
+                )
+            if expression in df.columns:
+                df = self.df[[col_event, expression]].copy()
+                df.columns = ["Event", "Expression"]
+
+                df.reset_index(drop=True, inplace=True)
+
+                # add procedure names
+                df["Procedure"] = df["Event"].apply(lambda x: x.top_event)
+                df = df[["Procedure", "Event", "Expression"]]
+                df.reset_index(drop=True, inplace=True)
+
+                event = df.columns.get_loc("Event")
+                exp = df.columns.get_loc("Expression")
+                # extract summary data for discrete events
+                df["Time"] = df.apply(
+                    lambda row: list(
+                        calc_summary(
+                            starttime=row[event].starttime,
+                            endtime=row[event].endtime,
+                            interval=interval,
+                            summary_types=summary_types,
+                            expression=row[exp],
+                            calculation_basis=calculation_basis,
+                            time_type=time_type,
+                            AFfilter_evaluation=AFfilter_evaluation,
+                            filter_interval=filter_interval,
+                        ).to_records(index=False)
+                    ),
+                    axis=1,
+                )
+            else:
+                raise AttributeError(
+                    f"The column option was set to True, but {expression} "
+                    + "is not a valid column name"
+                )
+
+        df = df.explode("Time")  # explode list to rows
+        df["Time"] = df["Time"].apply(
+            lambda x: [el for el in x] if not pd.isnull(x) else np.nan
+        )  # numpy record to list
+        df[["Summary", "Value", "Time"]] = df["Time"].apply(
             pd.Series
         )  # explode list to columns
         df.reset_index(drop=True, inplace=True)

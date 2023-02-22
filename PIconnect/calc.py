@@ -3,6 +3,8 @@
 """
 from typing import Union
 import datetime
+from pytz import timezone
+from PIconnect.config import PIConfig
 
 from PIconnect.AFSDK import AF
 from PIconnect.time import (
@@ -13,7 +15,8 @@ from PIconnect.PIConsts import (
     SummaryType,
     CalculationBasis,
     TimestampCalculation,
-    ExpressionSampleType,)
+    ExpressionSampleType,
+)
 
 import pandas as pd
 
@@ -91,23 +94,34 @@ def calc_summary(
     calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
     time_type: TimestampCalculation = TimestampCalculation.AUTO,
     AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.EXPRESSION_RECORDED_VALUES,
-    filter_interval: str = None,) -> pd.DataFrame:
-    
+    filter_interval: str = None,
+) -> pd.DataFrame:
+
     AFrange = to_af_time_range(starttime, endtime)
     AFinterval = AF.Time.AFTimeSpan.Parse(interval)
     AFfilter_interval = AF.Time.AFTimeSpan.Parse(filter_interval)
 
-    result = AF.Data.AFCalculation.CalculateSummaries(
-        0,
-        expression,
-        AFrange,
-        AFinterval,
-        summary_types,
-        calculation_basis,
-        AFfilter_evaluation,
-        AFfilter_interval,
-        time_type,
-    )
+    try:
+        result = AF.Data.AFCalculation.CalculateSummaries(
+            0,
+            expression,
+            AFrange,
+            AFinterval,
+            summary_types,
+            calculation_basis,
+            AFfilter_evaluation,
+            AFfilter_interval,
+            time_type,
+        )
+    except AF.PI.PIException as e:
+        if str(e).startswith("[-11091]"):
+            if type(endtime) == float:
+                endtime = timezone(PIConfig.DEFAULT_TIMEZONE).localize(
+                    datetime.datetime.now()
+                )
+            raise AttributeError(
+                f"Duration of '{starttime - endtime}' exceeds the maximum allowed collection limit, please exclude event or reduce query duration"
+            )
 
     df_final = pd.DataFrame()
     for x in result:  # per summary
@@ -120,4 +134,10 @@ def calc_summary(
         df["Summary"] = summary
         df_final = pd.concat([df_final, df], ignore_index=True)
 
-    return df_final[["Summary", "Value", "Timestamp",]]
+    return df_final[
+        [
+            "Summary",
+            "Value",
+            "Timestamp",
+        ]
+    ]
