@@ -29,7 +29,7 @@ def calc_recorded(
     """Returns dataframe that contains the result of evaluating the passed expression at each point in time
     over the passed time range where a recorded value exists for a member of the expression.
 
-    Expression arguments need to be entered as raw strings: r'expression'"""
+    Expression argument need to be entered as raw strings: r'expression'"""
     afrange = to_af_time_range(starttime, endtime)
     result = AF.Data.AFCalculation.CalculateAtRecordedValues(
         0, expression, afrange
@@ -96,6 +96,55 @@ def calc_summary(
     AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.EXPRESSION_RECORDED_VALUES,
     filter_interval: str = None,
 ) -> pd.DataFrame:
+    """Return dataframe of summary measures of calculations specified in expression,
+    for the specified duration and interval.
+
+    Args:
+        starttime (Union[str, datetime.datetime]): start time
+        endtime (Union[str, datetime.datetime]): end time
+        interval (str): The bounding time for the evaluation period.
+        summary_types (int): integers separated by '|'. List given
+            below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+
+            - TOTAL = 1: A total over the time span
+            - AVERAGE = 2: Average value over the time span
+            - MINIMUM = 4: The minimum value in the time span
+            - MAXIMUM = 8: The maximum value in the time span
+            - RANGE = 16: The range of the values (max-min) in the time
+                span
+            - STD_DEV = 32 : The sample standard deviation of the values
+                over the time span
+            - POP_STD_DEV = 64: The population standard deviation of the
+                values over the time span
+            - COUNT = 128: The sum of the event count (when the
+                calculation is event weighted). The sum of the event time
+                    duration (when the calculation is time weighted.)
+            - PERCENT_GOOD = 8192: The percentage of the data with a good
+                value over the time range. Based on time for time weighted
+                    calculations, based on event count for event weigthed
+                    calculations.
+            - TOTAL_WITH_UOM = 16384: The total over the time span, with
+                the unit of measurement that's associated with the input
+                (or no units if not defined for the input)
+            - ALL = 24831: A convenience to retrieve all summary types
+            - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
+                summary types for non-numeric data
+
+        expression (raw string): A string containing the expression to be evaluated.
+            The syntax for the expression generally follows the
+            Performance Equation syntax as described in
+            the PI Data Archive documentation.
+        calculation_basis (CalculationBasis, optional): Basis by which to
+            calculate the summary statistic.
+            Defaults to CalculationBasis.TIME_WEIGHTED.
+        time_type (TimestampCalculation, optional): How the timestamp is
+            calculated. Defaults to TimestampCalculation.AUTO.
+        AFfilter_evaluation (ExpressionSampleType, optional): Expression
+            Type. Defaults to
+            ExpressionSampleType.EXPRESSION_RECORDED_VALUES.
+
+    Returns:
+        pd.DataFrame: dataframe of summary measures"""
 
     AFrange = to_af_time_range(starttime, endtime)
     AFinterval = AF.Time.AFTimeSpan.Parse(interval)

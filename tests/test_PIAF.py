@@ -4,6 +4,7 @@ import PIconnect
 import datetime
 import pandas as pd
 
+
 def test_connection():
     """Test to check for connected servers and AF Databases"""
     assert (
@@ -177,14 +178,14 @@ def test_eventhierarchy(af_connect, af_timerange):
     assert (
         type(eventhierarchy) == pd.DataFrame
     ), "Output type should be pd.DataFrame"
-    assert eventhierarchy.shape == (11, 7), "Shape should be (11,7)"
+    assert eventhierarchy.shape == (6, 7), "Shape should be (6,7)"
 
     # add attributes
     eventhierarchy = eventhierarchy.ehy.add_attributes(
         attribute_names_list=["Equipment", "Manufacturer"],
         template_name="Unit_template",
     )
-    assert eventhierarchy.shape == (11, 9), "Shape should be (11,9)"
+    assert eventhierarchy.shape == (6, 9), "Shape should be (6,9)"
     assert (
         len(eventhierarchy["Equipment [Unit_template]"].unique()) == 3
     ), "Column should contain 3 unique values"
@@ -193,7 +194,7 @@ def test_eventhierarchy(af_connect, af_timerange):
     eventhierarchy = eventhierarchy.ehy.add_ref_elements(
         template_name="Operation_template"
     )
-    assert eventhierarchy.shape == (11, 10), "Shape should be (11,10)"
+    assert eventhierarchy.shape == (6, 10), "Shape should be (6,10)"
     assert (
         len(eventhierarchy["Referenced_el [Operation_template](0)"].unique())
         == 3
@@ -204,7 +205,7 @@ def test_eventhierarchy(af_connect, af_timerange):
     interpol_values_1 = eventhierarchy_1.ehy.interpol_discrete_extract(
         tag_list=["SINUSOID"], interval="1h", dataserver=server
     )
-    assert interpol_values_1.shape == (154, 12), "shape should be (154, 12)"
+    assert interpol_values_1.shape == (92, 12), "shape should be (92, 12)"
 
     # interpol extract - specify tag from column
     eventhierarchy_2 = eventhierarchy.copy()
@@ -236,7 +237,7 @@ def test_eventhierarchy(af_connect, af_timerange):
         dataserver=server,
         col=False,
     )
-    assert summary_values.shape == (33, 14), "shape should be (33, 14)"
+    assert summary_values.shape == (18, 14), "shape should be (18, 14)"
 
     # summary extract - specify tag from column
     summary_values_2 = eventhierarchy_2.ehy.summary_extract(
@@ -259,6 +260,17 @@ def test_eventhierarchy(af_connect, af_timerange):
         )
     except Exception as e:
         assert str(e) == "No tags were found for query: SINUSOIiD"
+
+    # calculation of summary measures of interval for calculated values
+    calc_summary_values = eventhierarchy.ehy.calc_summary_extract(
+        interval="100h",
+        summary_types=4 | 8,
+        expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
+        col=False,
+    )
+    assert len(calc_summary_values) == (
+        len(eventhierarchy) * 2
+    ), "len should be 22"
 
 
 def test_condensed(af_connect, af_timerange):
@@ -396,3 +408,12 @@ def test_condensed(af_connect, af_timerange):
     assert (
         summary_values["Value"].min() == 0.7622223496437073
     ), "minimum value should be 0.7622223496437073"
+
+    # calculation of summary measures of interval for calculated values
+    calc_summary_values = condensed.ecd.calc_summary_extract(
+        interval="100h",
+        summary_types=4 | 8,
+        expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
+        col=False,
+    )
+    assert len(calc_summary_values) == (len(condensed) * 2)

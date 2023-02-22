@@ -55,3 +55,12 @@ def test_calc_interpol(calc_timerange):
         r"TagTot('\\ITSBEBEPIHISCOL\SINUSOID', '01-Oct-2022 14:00:00', '03-Oct-2022 14:00:00')",
     )
     assert len(calc3) == 2, "Table length should be 2"
+
+    calc3 = PIconnect.calc.calc_summary(
+        starttime="1-10-2022 14:00",
+        endtime="1-10-2022 22:00",
+        interval="100h",
+        summary_types=4 | 8,
+        expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
+    )
+    assert len(calc3) == 2, "Table length should be 2"

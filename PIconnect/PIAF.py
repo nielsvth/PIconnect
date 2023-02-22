@@ -115,6 +115,8 @@ class EventList(UserList):
         afcontainer = AF.AFNamedCollectionList[
             AF.EventFrame.AFEventFrame
         ]()  # empty container
+
+        # option here to avoid redundancy and increase performance by checking if event is not a subevent
         for event in self.data:
             try:
                 afcontainer.Add(event.af_eventframe)
@@ -177,7 +179,7 @@ class EventList(UserList):
                 lambda x: x.endtime if x else np.nan
             )
 
-        return df_events
+        return df_events.drop_duplicates("Path")
 
 
 class Attribute:
@@ -607,7 +609,7 @@ class AssetList(UserList):
         else:
             return pd.DataFrame(
                 columns=["Asset", "Path", "Name", "Template", "Level"]
-            )
+            ).drop_duplicates("Path")
 
 
 try:
@@ -1516,7 +1518,7 @@ class Event:
             lambda x: x.endtime if x else np.nan
         )
 
-        return df_events
+        return df_events.drop_duplicates("Path")
 
 
 try:

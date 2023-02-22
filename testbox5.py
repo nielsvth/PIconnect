@@ -2,44 +2,44 @@ import PIconnect
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from PIconnect.AFSDK import AF
-from PIconnect.PI import (
-    convert_to_TagList,
-)
-from PIconnect.time import timestamp_to_index, add_timezone
+from pytz import timezone
 
-from PIconnect.PIConsts import TimestampCalculation, CalculationBasis
-
-# Set up timezone info
-PIconnect.PIConfig.DEFAULT_TIMEZONE = "Europe/Brussels"
-
+# Initiate connection to PI data server & PI AF database of interest by
+# defining their name
 with PIconnect.PIAFDatabase(
-    server="PIMS_EU_BEERSE_AF_PE", database="DeltaV-Events"
-) as afdatabase, PIconnect.PIServer(server="ITSBEBEPIHISCOL") as server:
+    server="ITSBEBEWSP06182 DEV", database="NuGreen"
+) as afdatabase, PIconnect.PIServer(
+    server=list(PIconnect.PIServer.servers.keys())[1]
+) as server:
 
-    eventlist = afdatabase.find_events(
-        query="*HR102164G4-*",
-        starttime="*-100d",
-        endtime="*-10d",
-        search_full_hierarchy=False,
+    start = timezone("Europe/Brussels").localize(
+        datetime(day=1, month=10, year=2022)
+    )
+    end = timezone("Europe/Brussels").localize(
+        datetime(day=4, month=10, year=2022)
     )
 
-# pick one event
-event = eventlist[1]
-eventhierarchy = event.get_event_hierarchy(depth=1)
-eventhierarchy = eventhierarchy.ehy.add_ref_elements(
-    template_name="UnitProcedure"
-)
+    eventlist = afdatabase.find_events(query="*", starttime=start, endtime=end)
+    eventhierarchy = eventlist.get_event_hierarchy(depth=2)
 
-print(event.name)
-print(event.starttime)
-print(event.endtime)
+    # add attributes
+    eventhierarchy = eventhierarchy.ehy.add_attributes(
+        attribute_names_list=["Equipment", "Manufacturer"],
+        template_name="Unit_template",
+    )
 
-# calculation on interpolated values
-# returns substracted values of TT08 and TT09 for R015
-calc = PIconnect.calc.calc_interpolated(
-    event.starttime,
-    event.endtime,
-    "1h",
-    r"('\\ITSBEBEPIHISCOL\100_091_R015_TT08')-('\\ITSBEBEPIHISCOL\100_091_R015_TT09')",
-)
+    # add referenced elements
+    eventhierarchy = eventhierarchy.ehy.add_ref_elements(
+        template_name="Operation_template"
+    )
+
+    condensed = eventhierarchy.ehy.condense()
+
+    # calculation of summary measures of interval for calculated values
+    calc_summary_values = condensed.ecd.calc_summary_extract(
+        interval="100h",
+        summary_types=4 | 8,
+        expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
+        col=False,
+    )
+    assert len(calc_summary_values) == (len(condensed) * 2)
