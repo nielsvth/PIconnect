@@ -146,16 +146,19 @@ def calc_summary(
     Returns:
         pd.DataFrame: dataframe of summary measures"""
 
-    AFrange = to_af_time_range(starttime, endtime)
-    AFinterval = AF.Time.AFTimeSpan.Parse(interval)
+    AFTimeRange = to_af_time_range(starttime, endtime)
+    if interval == 'event':
+        AFInterval = AF.Time.AFTimeSpan(AFTimeRange.Span)
+    else:
+        AFInterval = AF.Time.AFTimeSpan.Parse(interval)
     AFfilter_interval = AF.Time.AFTimeSpan.Parse(filter_interval)
 
     try:
         result = AF.Data.AFCalculation.CalculateSummaries(
             0,
             expression,
-            AFrange,
-            AFinterval,
+            AFTimeRange,
+            AFInterval,
             summary_types,
             calculation_basis,
             AFfilter_evaluation,

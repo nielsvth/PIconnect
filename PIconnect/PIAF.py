@@ -419,7 +419,7 @@ class Asset:
         template_name: str = None,
         start_index: int = 0,
         max_count: int = 1000000,
-        search_mode: SearchMode = SearchMode.OVERLAPPED,
+        search_mode: SearchMode = SearchMode.INCLUSIVE,
         search_full_hierarchy: bool = True,
         sortField: SortField = SortField.STARTTIME,
         sortOrder: SortOrder = SortOrder.ASCENDING,
@@ -438,7 +438,7 @@ class Asset:
             start_index (int, optional): Start Index. Defaults to 0.
             max_count (int, optional): Max Count. Defaults to 1000000.
             search_mode (SearchMode, optional): Search Mode.
-                Defaults to SearchMode.OVERLAPPED.
+                Defaults to SearchMode.INCLUSIVE.
             search_full_hierarchy (bool, optional): Boolean for whether to
                 search full hierarchy or not. Defaults to True.
             sortField (SortField, optional): Sorting field.
@@ -875,7 +875,7 @@ class PIAFDatabase(object):
         template_name: str = None,
         start_index: int = 0,
         max_count: int = 1000000,
-        search_mode: SearchMode = SearchMode.OVERLAPPED,
+        search_mode: SearchMode = SearchMode.INCLUSIVE,
         search_full_hierarchy: bool = True,
         sortField: SortField = SortField.STARTTIME,
         sortOrder: SortOrder = SortOrder.ASCENDING,
@@ -894,7 +894,7 @@ class PIAFDatabase(object):
             start_index (int, optional): Start Index. Defaults to 0.
             max_count (int, optional): Max Count. Defaults to 1000000.
             search_mode (SearchMode, optional): Search Mode.
-                Defaults to SearchMode.OVERLAPPED.
+                Defaults to SearchMode.INCLUSIVE.
             search_full_hierarchy (bool, optional): Boolean for whether to
                 search full hierarchy or not. Defaults to True.
             sortField (SortField, optional): Sorting field.

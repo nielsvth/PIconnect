@@ -673,7 +673,10 @@ class Tag:
             pd.DataFrame: Dataframe with requested summary statistics
         """
         AFTimeRange = to_af_time_range(starttime, endtime)
-        AFInterval = AF.Time.AFTimeSpan.Parse(interval)
+        if interval == 'event':
+            AFInterval = AF.Time.AFTimeSpan(AFTimeRange.Span)
+        else:
+            AFInterval = AF.Time.AFTimeSpan.Parse(interval)
 
         result = self.tag.Summaries(
             AFTimeRange,
@@ -749,7 +752,10 @@ class Tag:
             pd.DataFrame: Dataframe with requested summary statistics
         """
         AFTimeRange = to_af_time_range(starttime, endtime)
-        AFInterval = AF.Time.AFTimeSpan.Parse(interval)
+        if interval == 'event':
+            AFInterval = AF.Time.AFTimeSpan(AFTimeRange.Span)
+        else:
+            AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         filter_expression = filter_expression.replace("%tag%", self.name)
         AFfilter_interval = AF.Time.AFTimeSpan.Parse(filter_interval)
 
@@ -1147,7 +1153,10 @@ class TagList(UserList):
         """
         PIPointlist = generate_pipointlist(self)
         AFTimeRange = to_af_time_range(starttime, endtime)
-        AFInterval = AF.Time.AFTimeSpan.Parse(interval)
+        if interval == 'event':
+            AFInterval = AF.Time.AFTimeSpan(AFTimeRange.Span)
+        else:
+            AFInterval = AF.Time.AFTimeSpan.Parse(interval)
 
         result = PIPointlist.Summaries(
             AFTimeRange,
@@ -1256,7 +1265,10 @@ class TagList(UserList):
         """
         PIPointlist = generate_pipointlist(self)
         AFTimeRange = to_af_time_range(starttime, endtime)
-        AFInterval = AF.Time.AFTimeSpan.Parse(interval)
+        if interval == 'event':
+            AFInterval = AF.Time.AFTimeSpan(AFTimeRange.Span)
+        else:
+            AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         AFfilter_interval = AF.Time.AFTimeSpan.Parse(filter_interval)
         result = PIPointlist.FilteredSummaries(
             AFTimeRange,
