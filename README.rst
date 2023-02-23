@@ -636,7 +636,6 @@ Core functionality for doing advanced calculations and filtering
     )
 
     # calculation on interpolated values
-    # returns totalized value per minute, do *1440 to get per day
     calc2 = PIconnect.calc.calc_interpolated(
         "1-10-2022 14:00",
         "1-10-2022 14:00",
