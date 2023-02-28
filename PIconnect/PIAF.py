@@ -189,10 +189,16 @@ class Attribute:
         self.attribute = attribute
 
     def __repr__(self):
-        return f"Attribute: {self.attribute.Name} [source: {self.attribute.DataReferencePlugIn.Name}]"
+        if self.attribute.DataReferencePlugIn:
+            return f"Attribute: {self.attribute.Name} [source: {self.attribute.DataReferencePlugIn.Name}]"
+        else:
+            return f"Attribute: {self.attribute.Name} [source: None]"
 
     def __str__(self):
-        return f"Attribute: {self.attribute.Name} [source: {self.attribute.DataReferencePlugIn.Name}]"
+        if self.attribute.DataReferencePlugIn:
+            return f"Attribute: {self.attribute.Name} [source: {self.attribute.DataReferencePlugIn.Name}]"
+        else:
+            return f"Attribute: {self.attribute.Name} [source: None]"
 
     # properties
     @property
@@ -213,7 +219,10 @@ class Attribute:
     @property
     def source_type(self):
         """Return name of Attribute's data reference"""
-        return self.attribute.DataReference.Name
+        if self.attribute.DataReference:
+            return self.attribute.DataReference.Name
+        else:
+            return None
 
     @property
     def pipoint(self):

@@ -45,6 +45,7 @@ with PIconnect.PIAFDatabase(
 
     # https://docs.aveva.com/bundle/pi-server-af-analytics/page/1020877.html
     # https://www.hallam-ics.com/blog/creating-totalizers-in-pi-server-historian#:~:text=The%20PI%20Totalizer%20subsystem%20is,stored%20to%20the%20data%20archive.
+    # if you totalize values measured in gallons per minute, multiply the result of TagTot by 1440 to get the answer in gallons.
 
     # condensed["Expression"] = condensed[
     #    "Referenced_el [UnitProcedure](0)"
@@ -63,14 +64,37 @@ with PIconnect.PIAFDatabase(
     calc_summary_values["Duration(day)"] = calc_summary_values["Event"].apply(
         lambda x: x.duration.total_seconds() / 86400
     )
-    calc_summary_values["Avg_Value/min(day)"] = (
-        calc_summary_values["Value"] / calc_summary_values["Duration(day)"]
+    calc_summary_values["Avg_Value(RPM)"] = calc_summary_values["Value"] / (
+        calc_summary_values["Duration(day)"] * 1440
     )
 
     # order by Totalized Value
     calc_summary_values = calc_summary_values.sort_values(
         by="Value", ascending=False
     ).reset_index(drop=True)
+
+    final_ST01 = calc_summary_values.merge(
+        condensed, how="inner", left_on="Event", right_on="Event [3]"
+    )
+    final_ST01 = final_ST01[
+        [
+            "Procedure",
+            "Event",
+            "B_PH_INFO [Phase]",
+            "Expression_x",
+            "Time",
+            "Summary",
+            "Value",
+            "Duration(day)",
+            "Avg_Value(RPM)",
+        ]
+    ]
+    final_ST01.rename(
+        columns={"Expression_x": "Expression", "B_PH_INFO [Phase]": "Step"},
+        inplace=True,
+    )
+
+    STOP
 
     # TEST using TagTot
     starttime = "1-10-2022 14:00"
