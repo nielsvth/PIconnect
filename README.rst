@@ -688,7 +688,7 @@ Threading is currently available for:
     #initialize the threading function by providing source, appropriate class method, args dict and chunk_size
     res = PIconnect.thread.threading(
         source = condensed,
-        methoud = PIconnect.PIAF.CondensedEventHierarchy.summary_extract,
+        method = PIconnect.PIAF.CondensedEventHierarchy.summary_extract,
         args = x,
         chunk_size = 1000,
         )
