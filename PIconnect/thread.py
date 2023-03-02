@@ -3,6 +3,7 @@ import PIconnect
 import pandas as pd
 from typing import Union
 import types
+import numpy as np
 
 # https://realpython.com/intro-to-python-threading/
 
@@ -56,6 +57,8 @@ def source_extract(
         result = types.MethodType(
             method, PIconnect.PIAF.EventHierarchy(chunk)
         )(**args)
+    elif typ == "tag":
+        result = types.MethodType(method, PIconnect.PI.TagList(chunk))(**args)
     queue.append(result)
     return queue
 
@@ -83,13 +86,19 @@ def threading(
         # split df in smaller chunks for I/O bound threading
         lst_chunk = chunk(source, chunk_size)
         typ = "ecd"
-        if not (
-            method == PIconnect.PIAF.CondensedEventHierarchy.summary_extract
-        ) and not (
-            method
-            == PIconnect.PIAF.CondensedEventHierarchy.interpol_discrete_extract
-        ) and not (
-            method == PIconnect.PIAF.CondensedEventHierarchy.calc_summary_extract
+        if (
+            not (
+                method
+                == PIconnect.PIAF.CondensedEventHierarchy.summary_extract
+            )
+            and not (
+                method
+                == PIconnect.PIAF.CondensedEventHierarchy.interpol_discrete_extract
+            )
+            and not (
+                method
+                == PIconnect.PIAF.CondensedEventHierarchy.calc_summary_extract
+            )
         ):
             raise AttributeError(
                 "Threading only works for summary_extract, calc_summary_extract and interpol_discrete_extract methods"
@@ -115,6 +124,7 @@ def threading(
 
     elif "TagList" in str(method.__qualname__):
         # split tag list in smaller chunks for I/O bound threading
+        lst_chunk = chunk(source, chunk_size)
         typ = "tag"
 
     else:
@@ -140,4 +150,15 @@ def threading(
     for thread in thread_list:
         thread.join()
 
-    return pd.concat(queue).reset_index(drop=True)
+    if type(queue[0]) == pd.DataFrame:
+
+        # for summaries
+        if queue[0].index.dtype == np.int64:
+            return pd.concat(queue).reset_index(drop=True)
+        # for interpolated
+        else:
+            return queue
+
+    # for recorded/plot dicts
+    elif type(queue[0]) == dict:
+        return {k: v for d in queue for k, v in d.items()}
