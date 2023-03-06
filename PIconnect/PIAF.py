@@ -652,27 +652,32 @@ class AssetHierarchy:
 
     # methods
     def add_attributes(
-        self,
-        attribute_names_list: List[AF.Asset.AFAttribute],
-        level: int,
+        self, attribute_names_list, template_name
     ) -> pd.DataFrame:
-        """Add attributtes to AssetHierarchy for specified attributes and
-        level
-
-        Args:
-            attribute_names_list (List[AF.Asset.AFAttribute]):  List of
-                Attributes to query.
-            level (int): level to query to
-
-        Returns:
-            pd.DataFrame: self
-        """
+        """Add attribute values to AssetHierarchy for specified attributes
+        defined for the specified template"""
         print("Fetching attribute(s)...")
+        if type(template_name) == int:
+            template_name = self.df.loc[
+                self.df["Level"] == template_name, "Template"
+            ].iloc[0]
 
-        for attribute in attribute_names_list:
-            self.df[attribute + " [" + str(level) + "]"] = self.df.loc[
-                self.df["Level"] == level, "Event"
-            ].apply(lambda x: x.get_attribute_values([attribute])[attribute])
+        if template_name == None:
+            for attribute in attribute_names_list:
+                self.df[
+                    attribute + " [" + str(template_name) + "]"
+                ] = self.df.loc[self.df["Template"].isnull(), "Asset"].apply(
+                    lambda x: lambda_aux_add_attributes(x, attribute)
+                )
+        else:
+            for attribute in attribute_names_list:
+                self.df[
+                    attribute + " [" + str(template_name) + "]"
+                ] = self.df.loc[
+                    self.df["Template"] == template_name, "Asset"
+                ].apply(
+                    lambda x: lambda_aux_add_attributes(x, attribute)
+                )
 
         for colname in self.df.columns:
             try:
@@ -1579,10 +1584,22 @@ class EventHierarchy:
                 self.df["Level"] == template_name, "Template"
             ].iloc[0]
 
-        for attribute in attribute_names_list:
-            self.df[attribute + " [" + str(template_name) + "]"] = self.df.loc[
-                self.df["Template"] == template_name, "Event"
-            ].apply(lambda x: lambda_aux_add_attributes(x, attribute))
+        if template_name == None:
+            for attribute in attribute_names_list:
+                self.df[
+                    attribute + " [" + str(template_name) + "]"
+                ] = self.df.loc[self.df["Template"].isnull(), "Event"].apply(
+                    lambda x: lambda_aux_add_attributes(x, attribute)
+                )
+        else:
+            for attribute in attribute_names_list:
+                self.df[
+                    attribute + " [" + str(template_name) + "]"
+                ] = self.df.loc[
+                    self.df["Template"] == template_name, "Event"
+                ].apply(
+                    lambda x: lambda_aux_add_attributes(x, attribute)
+                )
 
         for colname in self.df.columns:
             try:
@@ -1600,11 +1617,18 @@ class EventHierarchy:
                 self.df["Level"] == template_name, "Template"
             ].iloc[0]
 
-        ref_el = (
-            self.df.loc[self.df["Template"] == template_name, "Event"]
-            .apply(lambda x: x.ref_elements)
-            .apply(pd.Series)
-        )
+        if template_name == None:
+            ref_el = (
+                self.df.loc[self.df["Template"].isnull(), "Event"]
+                .apply(lambda x: x.ref_elements)
+                .apply(pd.Series)
+            )
+        else:
+            ref_el = (
+                self.df.loc[self.df["Template"] == template_name, "Event"]
+                .apply(lambda x: x.ref_elements)
+                .apply(pd.Series)
+            )
 
         if ref_el.empty:
             raise AttributeError("No results found for the specified template")
