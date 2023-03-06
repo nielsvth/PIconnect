@@ -1,0 +1,12 @@
+importlib-metadata
+pandas
+wrapt
+pytz
+pythonnet
+tzlocal
+
+[testing]
+setuptools
+pytest
+pytest-cov
+black
