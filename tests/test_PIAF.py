@@ -1,61 +1,419 @@
-"""Test communication with the PI AF system"""
-from typing import cast, List
-import pytest
+"""Unit Tests for PIAF.py Module""" ""
 
-import PIconnect as PI
-from PIconnect._typing import AF
+import PIconnect
+import datetime
+import pandas as pd
 
 
-class TestAFDatabase:
-    """Test connecting to the AF database"""
+def test_connection():
+    """Test to check for connected servers and AF Databases"""
+    assert (
+        len(PIconnect.PIServer.servers) >= 1
+    ), "Should be larger or equal to 1"
+    assert (
+        len(PIconnect.PIAFDatabase.servers) >= 1
+    ), "Should be larger or equal to 1"
 
-    def test_connection(self):
-        """Test that creating a PI.PIAFDatabase object without arguments raises no exception"""
-        PI.PIAFDatabase()
 
-    def test_server_name(self):
-        """Test that the server reports the same name as which was connected to."""
-        AFserver = PI.AF.PISystems().DefaultPISystem.Name
-        database = PI.AF.PISystems().DefaultPISystem.Databases.DefaultDatabase.Name
-        server = PI.PIAFDatabase(AFserver, database)
-        assert server.server_name == AFserver
-        assert server.database_name == database
-        assert repr(server) == "PIAFDatabase(\\\\{s}\\{d})".format(
-            s=AFserver, d=database
+def test_find_assets(af_connect):
+    """Test to find Assets on AFDatabase"""
+    afdatabase = af_connect[0]
+    assetlist = afdatabase.find_assets(query="Equipment")
+    assert len(assetlist) == 11, "Should be 11"
+    asset = assetlist[0].children[0]
+    assert asset.name == "B-334", "should be 'B-334'"
+    assert len(asset.attributes) == 21, "Should be 21"
+    assert (
+        asset.get_attribute_values()["Plant"] == "Wichita"
+    ), "Should be 'Wichita'"
+
+
+def test_find_events(af_connect, af_timerange):
+    """Test to find events on AFDatabase"""
+    starttime = af_timerange[0]
+    endtime = af_timerange[1]
+
+    afdatabase = af_connect[0]
+    eventlist = afdatabase.find_events(
+        query="*", starttime=starttime, endtime=endtime
+    )
+    assert len(eventlist) == 6, "Should be 6"
+    event = eventlist[0]
+    assert event.name == "Unit 1", "Should be 'Unit 1'"
+    assert event.parent.name == "Batch A", "Should be 'Batch A'"
+    assert (
+        type(event.starttime) == datetime.datetime
+    ), "Should be of type datetime.datetime"
+    assert (
+        type(event.duration) == datetime.timedelta
+    ), "Should be of type datetime.timedelta"
+    assert event.template_name == "Unit_template", "Should be 'Unit_template'"
+    assert len(event.attributes) == 2, "Should be 2"
+    assert event.ref_elements[0] == "P-560", "Should be 'P-560'"
+    assert (
+        event.get_attribute_values()["Manufacturer"] == "Sterns"
+    ), "Should be 'Sterns'"
+
+
+def test_attributes(af_connect):
+    """Test for attribute class"""
+    afdatabase = af_connect[0]
+    assetlist = afdatabase.find_assets(query="Equipment")
+    asset = assetlist[0].children[0]
+    assert len(asset.attributes) == 21, "Should be 21"
+    attribute = asset.attributes[3]
+    assert attribute.name == "Water Flow", "Should be 'Water Flow'"
+    assert attribute.source_type == "PI Point", "Should be 'PI Point'"
+    assert attribute.parent.name == "B-334", "should be 'B-334'"
+
+
+def test_attribute_extracts(af_connect):
+    """Test extraction functionalty for Attributes"""
+    afdatabase = af_connect[0]
+    assetlist = afdatabase.find_assets(query="Equipment")
+    asset = assetlist[0].children[0]
+
+    # Attribute is pipoint
+    attribute_tag = asset.attributes[3].pipoint
+    result = attribute_tag.interpolated_values(
+        starttime="*-10d", endtime="*", interval="1h"
+    )
+    assert type(result) == pd.DataFrame, "Output type should be pd.DataFrame"
+    assert result.shape == (241, 1), "Shape should be (241,1)"
+
+    # Attribute is Formula
+    result = asset.attributes[-8].current_value()
+    assert type(result) == float, "Output type should be a float"
+
+    # Attribute is a Table lookup
+    assert (
+        type(asset.attributes[-11].current_value()) == datetime.datetime
+    ), "Output type should be datetime.datetime"
+
+
+def test_event_extracts(af_connect, af_timerange):
+    """Test extraction functionalty for Events"""
+    starttime = af_timerange[0]
+    endtime = af_timerange[1]
+
+    afdatabase, server = af_connect
+    eventlist = afdatabase.find_events(
+        query="*", starttime=starttime, endtime=endtime
+    )
+    event = eventlist[0]
+
+    # interpolated
+    result = event.interpolated_values(
+        tag_list=["SINUSOID"], interval="1h", dataserver=server
+    )
+    assert type(result) == pd.DataFrame, "Output type should be pd.DataFrame"
+    assert result.shape == (16, 1), "Shape should be (16,1)"
+
+    # recorded
+    result = event.recorded_values(
+        tag_list=["SINUSOID"],
+        filter_expression="'SINUSOID' >= 0",
+        dataserver=server,
+    )
+    assert (
+        type(result) == dict
+    ), "Output type should be a dict containing a pd.DataFrame"
+    assert (
+        type(result["SINUSOID"]) == pd.DataFrame
+    ), "Output type should be a dict containing a pd.DataFrame"
+    assert result["SINUSOID"].shape == (
+        10,
+        1,
+    ), "Output shape should not (10,1)"
+
+    # gives error when non-existent tag is used
+    try:
+        result = event.recorded_values(
+            tag_list=["SINUSOIiD"],
+            filter_expression="'SINUSOID' >= 0",
+            dataserver=server,
         )
+    except Exception as e:
+        assert str(e) == "No tags were found for query: SINUSOIiD"
 
-    def test_unknown_server_name(self):
-        """Test that the server reports a warning for an unknown server."""
-        AFserver_name = "__".join(
-            [name for name in PI.PIAFDatabase.servers] + ["UnkownServerName"]
+    # summary
+    result = event.summary(
+        tag_list=["SINUSOID"], summary_types=4 | 8 | 128, dataserver=server
+    )
+    assert (
+        result.loc[(result["Summary"] == "MAXIMUM"), "Value"].iloc[0]
+        == 99.1600341796875
+    ), "Max shoud be 99.1600341796875"
+    assert (
+        result.loc[(result["Summary"] == "COUNT"), "Value"].iloc[0]
+        == event.duration.total_seconds()
+    )
+
+    # filtered summaries
+    # EventWeighted instead of TimeWeighted avoids issues with return values outside of filter range
+    # But, returns no result if no events within the interval range
+    result = event.filtered_summaries(
+        tag_list=["SINUSOID"],
+        interval="4h",
+        summary_types=4 | 8,
+        filter_expression="('SINUSOID' >= 20)",
+        dataserver=server,
+        calculation_basis=1,
+    )
+    assert type(result) == pd.DataFrame, "Output type should be pd.DataFrame"
+    assert result.shape == (6, 4), "Shape should be (6,4)"
+    assert result["Value"].min() == 24.235179901123047
+
+
+def test_eventhierarchy(af_connect, af_timerange):
+    """Test functionalty for EventHierarchy class"""
+    starttime = af_timerange[0]
+    endtime = af_timerange[1]
+
+    afdatabase, server = af_connect
+    eventlist = afdatabase.find_events(
+        query="*", starttime=starttime, endtime=endtime
+    )
+    eventhierarchy = eventlist.get_event_hierarchy(depth=2)
+    assert (
+        type(eventhierarchy) == pd.DataFrame
+    ), "Output type should be pd.DataFrame"
+    assert eventhierarchy.shape == (6, 7), "Shape should be (6,7)"
+
+    # add attributes
+    eventhierarchy = eventhierarchy.ehy.add_attributes(
+        attribute_names_list=["Equipment", "Manufacturer"],
+        template_name="Unit_template",
+    )
+    assert eventhierarchy.shape == (6, 9), "Shape should be (6,9)"
+    assert (
+        len(eventhierarchy["Equipment [Unit_template]"].unique()) == 3
+    ), "Column should contain 3 unique values"
+
+    # add referenced elements
+    eventhierarchy = eventhierarchy.ehy.add_ref_elements(
+        template_name="Operation_template"
+    )
+    assert eventhierarchy.shape == (6, 10), "Shape should be (6,10)"
+    assert (
+        len(eventhierarchy["Referenced_el [Operation_template](0)"].unique())
+        == 3
+    ), "Column should contain 3 unique values"
+
+    # interpol extract - specify tag from list
+    eventhierarchy_1 = eventhierarchy.copy()
+    interpol_values_1 = eventhierarchy_1.ehy.interpol_discrete_extract(
+        tag_list=["SINUSOID"], interval="1h", dataserver=server
+    )
+    assert interpol_values_1.shape == (92, 12), "shape should be (92, 12)"
+
+    # interpol extract - specify tag from column
+    eventhierarchy_2 = eventhierarchy.copy()
+    eventhierarchy_2["Tag"] = "SINUSOID"
+
+    interpol_values_2 = eventhierarchy_2.ehy.interpol_discrete_extract(
+        tag_list=["Tag"], interval="1h", dataserver=server, col=True
+    )
+    assert (
+        interpol_values_1.shape[0] == interpol_values_2.shape[0]
+    ), "should have same length"
+
+    # interpol extract - including non-existent tag, will return an Error
+    eventhierarchy_3 = eventhierarchy.copy()
+    eventhierarchy_3["Tag"] = "SINUSOID"
+    eventhierarchy_3["Tag"].iloc[4] = "SINUSOIiD"  # non existing tag
+
+    try:
+        interpol_values_3 = eventhierarchy_3.ehy.interpol_discrete_extract(
+            tag_list=["Tag"], interval="1h", dataserver=server, col=True
         )
-        with pytest.warns(UserWarning):
-            PI.PIAFDatabase(server=AFserver_name)
+    except Exception as e:
+        assert str(e) == "No tags were found for query: SINUSOIiD"
 
-    def test_unknown_database_name(self):
-        """Test that the server reports a warning for an unknown database."""
-        server = cast(AF.PISystem, PI.PIAFDatabase.default_server["server"]) # type: ignore
-        databases = [db.Name for db in server.Databases]
-        AFdatabase_name = "__".join(databases + ["UnkownDatabaseName"])
-        with pytest.warns(UserWarning):
-            PI.PIAFDatabase(database=AFdatabase_name)
+    # summary extract - specify tag from list
+    summary_values = eventhierarchy_1.ehy.summary_extract(
+        tag_list=["SINUSOID"],
+        summary_types=4 | 8 | 32,
+        dataserver=server,
+        col=False,
+    )
+    assert summary_values.shape == (18, 14), "shape should be (18, 14)"
+
+    # summary extract - specify tag from column
+    summary_values_2 = eventhierarchy_2.ehy.summary_extract(
+        tag_list=["Tag"],
+        summary_types=4 | 8 | 32,
+        dataserver=server,
+        col=True,
+    )
+    assert (
+        summary_values.shape[0] == summary_values_2.shape[0]
+    ), "should have same length"
+
+    # interpol extract - including non-existent tag, will return an Error
+    try:
+        summary_values_3 = eventhierarchy_3.ehy.summary_extract(
+            tag_list=["Tag"],
+            summary_types=4 | 8 | 32,
+            dataserver=server,
+            col=True,
+        )
+    except Exception as e:
+        assert str(e) == "No tags were found for query: SINUSOIiD"
+
+    # calculation of summary measures of interval for calculated values
+    calc_summary_values = eventhierarchy.ehy.calc_summary_extract(
+        interval="100h",
+        summary_types=4 | 8,
+        expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
+        col=False,
+    )
+    assert len(calc_summary_values) == (
+        len(eventhierarchy) * 2
+    ), "len should be 22"
 
 
-class TestDatabaseDescendants:
-    """Test retrieving child elements"""
+def test_condensed(af_connect, af_timerange):
+    """Test functionalty for CondensedHierarchy class"""
+    starttime = af_timerange[0]
+    endtime = af_timerange[1]
 
-    def test_children(self):
-        """Test that calling children on the database returns a dict of child elements"""
-        with PI.PIAFDatabase() as db:
-            children = db.children
-        assert isinstance(children, dict)
+    afdatabase, server = af_connect
+    eventlist = afdatabase.find_events(
+        query="*", starttime=starttime, endtime=endtime
+    )
+    eventhierarchy = eventlist.get_event_hierarchy(depth=2)
 
+    # add attributes
+    eventhierarchy = eventhierarchy.ehy.add_attributes(
+        attribute_names_list=["Equipment", "Manufacturer"],
+        template_name="Unit_template",
+    )
 
-class TestDatabaseSearch:
-    """Test retrieving attributes"""
+    # add referenced elements
+    eventhierarchy = eventhierarchy.ehy.add_ref_elements(
+        template_name="Operation_template"
+    )
 
-    def test_search(self):
-        """Test that calling attributes on the database returns a list of attributes"""
-        with PI.PIAFDatabase() as db:
-            attributes = db.search([r'', r''])
-        assert isinstance(attributes, list)
+    # create condensed dataframe
+    condensed = eventhierarchy.ehy.condense()
+
+    # interpol-disecrete extract, including filter expression, specify tag from list
+    disc_interpol_values = condensed.ecd.interpol_discrete_extract(
+        tag_list=["SINUSOID"],
+        interval="1m",
+        filter_expression="'SINUSOID' > 40",
+        dataserver=server,
+        col=False,
+    )
+    assert disc_interpol_values.shape == (1163, 4), "shape should be (1163,4)"
+    assert (
+        disc_interpol_values["SINUSOID"].min() == 40.02945
+    ), "filtered minimum value should be 40.02945"
+
+    # interpol-disecrete extract, including non-existent tag, will return an Error
+    try:
+        disc_interpol_values = condensed.ecd.interpol_discrete_extract(
+            tag_list=["SINUSOIiD"],
+            interval="1m",
+            filter_expression="'SINUSOID' > 40",
+            dataserver=server,
+            col=False,
+        )
+    except Exception as e:
+        assert str(e) == "No tags were found for query: SINUSOIiD"
+
+    # add Tag columns
+    condensed["Tag"] = "SINUSOID"
+    condensed["Tag"].iloc[0] = "SINUSOIDU"
+
+    # interpol-disecrete extract, including filter expression, specify tag from col
+    disc_interpol_values = condensed.ecd.interpol_discrete_extract(
+        tag_list=["Tag"],
+        interval="1m",
+        filter_expression="'SINUSOID' > 40",
+        dataserver=server,
+        col=True,
+    )
+    assert disc_interpol_values.shape == (1163, 5), "shape should be (1163,5)"
+    assert (
+        disc_interpol_values["Value"].min() == 3.387192
+    ), "filtered minimum value should be 3.387192"
+
+    # contin-disecrete extract, including filter expression
+    disc_interpol_values = condensed.ecd.interpol_continuous_extract(
+        tag_list=["SINUSOID"],
+        interval="1m",
+        filter_expression="'SINUSOID' > 40",
+        dataserver=server,
+    )
+    assert disc_interpol_values.shape == (1161, 4), "shape should be (1161,4)"
+    assert (
+        disc_interpol_values["SINUSOID"].min() == 40.02945
+    ), "filtered minimum value should be 40.02945"
+
+    # recorded extract, including filter expression
+    rec_values = condensed.ecd.recorded_extract(
+        tag_list=["SINUSOID"],
+        filter_expression="'SINUSOID' > 40",
+        dataserver=server,
+    )
+    assert rec_values["EventFrames[Batch A]"]["SINUSOID"].shape == (
+        13,
+        3,
+    ), "shape should be (13,3)"
+    assert (
+        rec_values["EventFrames[Batch A]"]["SINUSOID"]["Data"].min()
+        == 67.43513
+    ), "filtered minimum value should be 67.43513"
+
+    # plot extract
+    plot_values = condensed.ecd.plot_continuous_extract(
+        tag_list=["SINUSOID"],
+        nr_of_intervals=5,
+        dataserver=server,
+    )
+    assert plot_values["EventFrames[Batch A]"]["SINUSOID"].shape == (
+        15,
+        3,
+    ), "shape should be (13,3)"
+    assert (
+        plot_values["EventFrames[Batch A]"]["SINUSOID"]["Data"].min()
+        == 0.7622223
+    ), "minimum value should be 0.7622223"
+
+    # summary extract, tags from taglist
+    summary_values = condensed.ecd.summary_extract(
+        tag_list=["SINUSOID"],
+        summary_types=4 | 8 | 32,
+        dataserver=server,
+        col=False,
+    )
+    assert summary_values.shape == (9, 6), "shape should be (9,7)"
+    assert (
+        summary_values["Value"].min() == 0.7622223496437073
+    ), "minimum value should be 0.7622223496437073"
+
+    # ad Tag column to condensed dataframe
+    condensed["Tag"] = "SINUSOID"
+
+    # summary extract, tags from column
+    summary_values = condensed.ecd.summary_extract(
+        tag_list=["Tag"],
+        summary_types=4 | 8 | 32,
+        dataserver=server,
+        col=True,
+    )
+    assert summary_values.shape == (9, 7), "shape should be (9,7)"
+    assert (
+        summary_values["Value"].min() == 0.7622223496437073
+    ), "minimum value should be 0.7622223496437073"
+
+    # calculation of summary measures of interval for calculated values
+    calc_summary_values = condensed.ecd.calc_summary_extract(
+        interval="100h",
+        summary_types=4 | 8,
+        expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
+        col=False,
+    )
+    assert len(calc_summary_values) == (len(condensed) * 2)

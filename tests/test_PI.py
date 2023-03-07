@@ -1,129 +1,240 @@
-""" PIconnect.test.test_PI
-    Test communication with the PI System.
-"""
+"""Unit Tests for PI.py Module""" ""
+
+import PIconnect
 import datetime
+import pandas as pd
 
-import pytest
-import pytz
-
-import PIconnect as PI
-
-from .fakes import pi_point  # pylint: disable=unused-import
-
-
-class TestServer:
-    """Test connecting to the server"""
-
-    def test_connection(self):
-        """Test that creating a PI.PIServer object without arguments raises no exception"""
-        PI.PIServer()
-
-    def test_server_name(self):
-        """Test that the server reports the same name as which was connected to."""
-        servername = PI.PIServer.default_server.Name
-        server = PI.PIServer(servername)
-        assert server.server_name == servername
-
-    def test_warn_unkown_server(self):
-        """Test that the server reports a warning when an unknown host is specified."""
-        server_names = [name for name in PI.PIServer.servers]
-        server_name = "__".join(server_names + ["UnknownHostName"])
-        with pytest.warns(UserWarning):
-            PI.PIServer(server_name)
-
-    def test_repr(self):
-        """Test that the server representation matches the connected server."""
-        servername = PI.PIServer.default_server.Name
-        server = PI.PIServer(servername)
-        assert repr(server) == "PIServer(\\\\{})".format(servername)
+def test_connection():
+    """Test to check for connected servers"""
+    assert (
+        len(PIconnect.PIServer.servers) >= 1
+    ), "Should be larger or equal to 1"
 
 
-class TestSearchPIPoints:
-    """Test searching for PI Points on the default server."""
-
-    def test_search_single_string(self):
-        """Test searching for PI points using a single string."""
-        with PI.PIServer() as server:
-            points = server.search("L_140_053*")
-            assert isinstance(points, list)
-            for point in points:
-                assert isinstance(point, PI.PI.PIPoint)
-
-    def test_search_multiple_strings(self):
-        """Tests searching for PI points using a list of strings."""
-        with PI.PIServer() as server:
-            points = server.search(["L_140_053*", "M_127*"])
-            assert isinstance(points, list)
-            for point in points:
-                assert isinstance(point, PI.PI.PIPoint)
-
-    # def test_search_integer_raises_error(self):
-    #     """Tests searching for PI points using an integer raises a TypeError."""
-    #     with PI.PIServer() as server, self.assertRaises(TypeError):
-    #         server.search(1)
+def test_find_tags(af_connect):
+    """Test to find Tags on AFDatabase"""
+    # Use default PIserver
+    # SINUSOID is a default tag available on any PIServer
+    server = af_connect[1]
+    taglist = server.find_tags("SINUSOID")
+    assert len(taglist) == 1, "Should be 1"
+    tag = taglist[0]
+    assert tag.name == "SINUSOID", "should be 'SINUSOID'"
+    assert len(tag.raw_attributes) == 58, "should be 58"
+    assert (
+        tag.description == "12 Hour Sine Wave"
+    ), "tag description should be '12 Hour Sine Wave'"
 
 
-class TestPIPoint:
-    """Test valid interface of PIPoint."""
+def test_tags(af_connect, pi_timerange):
+    """Test functionalty of the Tag/Pipoint class"""
+    starttime = pi_timerange[0]
+    endtime = pi_timerange[1]
 
-    def test_repr(self, pi_point):
-        """Test representation of the PI Point."""
-        assert repr(pi_point.point) == "%s(%s, %s; Current Value: %s %s)" % (
-            "PIPoint",
-            pi_point.tag,
-            pi_point.attributes["descriptor"],
-            pi_point.values[-1],
-            pi_point.attributes["engunits"],
-        )
+    server = af_connect[1]
+    taglist = server.find_tags("SINUSOID")
+    tag = taglist[0]
 
-    def test_name(self, pi_point):
-        """Test retrieving the name of the PI Point."""
-        assert pi_point.point.tag == pi_point.tag
+    # interpolated value
+    assert (
+        type(tag.interpolated_value(time=starttime)[0]) == datetime.datetime
+    ), "type should be datetime.datetime"
+    assert (
+        tag.interpolated_value(time=starttime)[1] == 49.45119
+    ), "result should be 49.45119"
 
-    def test_current_value(self, pi_point):
-        """Test retrieving the current value from a PI point."""
-        assert pi_point.point.current_value == pi_point.values[-1]
-
-    def test_last_update(self, pi_point):
-        """Test retrieving the last update timestamp."""
-        origin = datetime.datetime(1970, 1, 1).replace(tzinfo=pytz.utc)
-        assert (
-            round(
-                (pi_point.point.last_update - origin).total_seconds()
-                - pi_point.timestamp_numbers[-1],
-                ndigits=7,
+    # interpolated values
+    assert (
+        len(
+            tag.interpolated_values(
+                starttime=starttime, endtime=endtime, interval="1h"
             )
-            == 0
         )
+        == 217
+    ), "length of result should be 217"
 
-    def test_units_of_measurement(self, pi_point):
-        """Test retrieving the units of measurement of the returned PI point."""
-        assert pi_point.point.units_of_measurement == pi_point.attributes["engunits"]
+    # recorded values
+    assert (
+        len(tag.recorded_values(starttime=starttime, endtime=endtime)) == 146
+    ), "length of result should be 146"
 
-    def test_description(self, pi_point):
-        """Test retrieving the description of the PI point."""
-        assert pi_point.point.description == pi_point.attributes["descriptor"]
+    # recorded values, with filter expression
+    assert (
+        len(
+            tag.recorded_values(
+                starttime=starttime,
+                endtime=endtime,
+                filter_expression="'%tag%' > 30",
+            )
+        )
+        == 74
+    ), "length of result should be 74"
 
-    def test_raw_attributes(self, pi_point):
-        """Test retrieving the attributes of the PI point as a dict."""
-        assert pi_point.point.raw_attributes == pi_point.attributes
+    assert (
+        tag.recorded_values(
+            starttime=starttime,
+            endtime=starttime,
+            filter_expression="'%tag%' > 30",
+        )["SINUSOID"].min()
+        == 49.45119
+    ), "minimum value should be 49.45119"
 
-    def test_recorded_values_values(self, pi_point):
-        """Test retrieving some recorded data from the server."""
-        data = pi_point.point.recorded_values("01-07-2017", "02-07-2017")
-        assert list(data.values) == pi_point.values
+    # plot values
+    assert (
+        len(
+            tag.plot_values(
+                starttime=starttime, endtime=endtime, nr_of_intervals=10
+            )
+        )
+        == 39
+    ), "length of result should be 39"
 
-    def test_recorded_values_timestamps(self, pi_point):
-        """Test retrieving some recorded data from the server."""
-        data = pi_point.point.recorded_values("01-07-2017", "02-07-2017")
-        assert list(data.index) == pi_point.timestamps
+    # summary values
+    assert (
+        len(
+            tag.summary(
+                starttime=starttime,
+                endtime=endtime,
+                summary_types=2 | 4 | 8,
+            )
+        )
+        == 3
+    ), "length of result should be 3"
 
-    def test_interpolated_values_values(self, pi_point):
-        """Test retrieving some interpolated data from the server."""
-        data = pi_point.point.interpolated_values("01-07-2017", "02-07-2017", "1h")
-        assert list(data.values) == pi_point.values
+    # summaries values
+    assert (
+        len(
+            tag.summaries(
+                starttime=starttime,
+                endtime=endtime,
+                interval="1d",
+                summary_types=2 | 4 | 8,
+            )
+        )
+        == 27
+    ), "length of result should be 27"
 
-    def test_interpolated_values_timestamps(self, pi_point):
-        """Test retrieving some interpolated data from the server."""
-        data = pi_point.point.interpolated_values("01-07-2017", "02-07-2017", "1h")
-        assert list(data.index) == pi_point.timestamps
+    # filtered_summaries
+    assert (
+        len(
+            tag.filtered_summaries(
+                starttime=starttime,
+                endtime=endtime,
+                interval="1d",
+                summary_types=2 | 4 | 8,
+                filter_expression="'SINUSOID' > 20",
+            )
+        )
+        == 27
+    ), "length of result should be 27"
+
+    assert (
+        tag.filtered_summaries(
+            starttime=starttime,
+            endtime=endtime,
+            interval="1d",
+            summary_types=2 | 4 | 8,
+            filter_expression="'SINUSOID' > 20",
+        )["Value"].min()
+        == 24.005191802978516
+    ), "minimum value should be 24.005191802978516"
+
+
+def test_taglist(af_connect, pi_timerange):
+    """Test functionalty of the TagList class"""
+    starttime = pi_timerange[0]
+    endtime = pi_timerange[1]
+
+    server = af_connect[1]
+    taglist1 = server.find_tags("SINUSOID")
+    taglist2 = server.find_tags("SINUSOIDU")
+    taglist = taglist1 + taglist2
+    assert len(taglist) == 2, "TagList should contain 2 Tags"
+
+    # current value
+    assert (
+        len(taglist.current_value().columns) == 2
+    ), "Table should have 2 columns"
+
+    # interpolated value
+    assert (
+        type(taglist.interpolated_value(time="1-1-2022")) == pd.DataFrame
+    ), "Output is of type dataframe"
+
+    # interpolated values
+    assert taglist.interpolated_values(
+        starttime=starttime, endtime=endtime, interval="1h"
+    ).shape == (217, 2), "shape of result should be (217, 2)"
+
+    # recorded values
+    assert (
+        type(taglist.recorded_values(starttime=starttime, endtime=endtime))
+        == dict
+    ), "returns a dict object"
+    assert taglist.recorded_values(starttime=starttime, endtime=endtime)[
+        "SINUSOID"
+    ].shape == (146, 1), "shape of 'SINUSOID' table is (146,1)"
+
+    # plot values
+    assert list(
+        taglist.plot_values(
+            starttime=starttime, endtime=endtime, nr_of_intervals=10
+        ).keys()
+    ) == [
+        "SINUSOID",
+        "SINUSOIDU",
+    ], "returns a dict object with keys ['SINUSOID', 'SINUSOIDU']"
+
+    assert taglist.plot_values(
+        starttime=starttime, endtime=endtime, nr_of_intervals=10
+    )["SINUSOID"].shape == (39, 1), "shape of 'SINUSOID' table is (39,1)"
+
+    # summary values
+    assert (
+        len(
+            taglist.summary(
+                starttime=starttime,
+                endtime=endtime,
+                summary_types=2 | 4 | 8,
+            )
+        )
+        == 6
+    ), "length of result should be 6"
+
+    # summaries values
+    assert (
+        len(
+            taglist.summaries(
+                starttime=starttime,
+                endtime=endtime,
+                interval="1d",
+                summary_types=2 | 4 | 8,
+            )
+        )
+        == 54
+    ), "length of result should be 54"
+
+    # filtered_summaries
+    assert (
+        len(
+            taglist.filtered_summaries(
+                starttime=starttime,
+                endtime=endtime,
+                interval="1d",
+                summary_types=2 | 4 | 8,
+                filter_expression="'SINUSOID' > 20",
+            )
+        )
+        == 54
+    ), "length of result should be 54"
+
+    assert (
+        taglist.filtered_summaries(
+            starttime=starttime,
+            endtime=endtime,
+            interval="1d",
+            summary_types=2 | 4 | 8,
+            filter_expression="'SINUSOID' > 20",
+        )["Value"].min()
+        == 24.005191802978516
+    ), "minimum value should be 24.005191802978516"

@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: PIconnect
-Version: 0.10.6.post1.dev27+g6901522.d20230306
+Version: 0.10.6.post1.dev29+g65edf68.d20230307
 Summary: Python connector to OSIsoft PI SDK
 Home-page: https://github.com/Hugovdberg/PIconnect
 Author: Hugo Lapré
