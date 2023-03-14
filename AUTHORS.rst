@@ -13,3 +13,5 @@ Contributors
 * Stijn de Jong
 * AlcibiadesCleinias <https://github.com/AlcibiadesCleinias>
 * Leandro Dariva Pinto <https://github.com/ldariva>
+* Niels Vanthillo <https://github.com/nielsvth>
+* Ryan Wall <https://github.com/arden13>
