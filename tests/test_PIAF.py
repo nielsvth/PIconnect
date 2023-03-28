@@ -67,8 +67,11 @@ def test_attributes(af_connect):
     assert attribute.parent.name == "B-334", "should be 'B-334'"
 
 
-def test_attribute_extracts(af_connect):
+def test_attribute_extracts(af_connect, af_timerange):
     """Test extraction functionalty for Attributes"""
+    starttime = af_timerange[0]
+    endtime = af_timerange[1]
+
     afdatabase = af_connect[0]
     assetlist = afdatabase.find_assets(query="Equipment")
     asset = assetlist[0].children[0]
@@ -76,10 +79,10 @@ def test_attribute_extracts(af_connect):
     # Attribute is pipoint
     attribute_tag = asset.attributes[3].pipoint
     result = attribute_tag.interpolated_values(
-        starttime="*-10d", endtime="*", interval="1h"
+        starttime=starttime, endtime=endtime, interval="1h"
     )
     assert type(result) == pd.DataFrame, "Output type should be pd.DataFrame"
-    assert result.shape == (241, 1), "Shape should be (241,1)"
+    assert result.shape == (73, 1), "Shape should be (73,1)"
 
     # Attribute is Formula
     result = asset.attributes[-8].current_value()
