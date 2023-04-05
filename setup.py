@@ -19,30 +19,28 @@ HERE = path.abspath(path.dirname(__file__))
 with open(path.join(HERE, "README.rst"), encoding="utf-8") as readme_file:
     README = readme_file.read()
 
-with open(path.join(HERE, "HISTORY.rst"), encoding="utf-8") as history_file:
-    HISTORY = history_file.read()
+LONG_DESCRIPTION = (README).replace("\r\n", "\n")
 
-LONG_DESCRIPTION = (README + "\n\n" + HISTORY).replace("\r\n", "\n")
-
-if sys.version_info[:2] < (3, 4):
-    REQUIREMENTS = ["enum34"]
-else:
-    REQUIREMENTS = []
-
-REQUIREMENTS += ["future", "pandas", "wrapt", "pytz"]
-if os.name == "nt":
-    REQUIREMENTS += ["pythonnet"]
+REQUIREMENTS = [
+    "tzlocal",
+    "numpy",
+    "pytz",
+    "pythonnet==2.5.1",
+    "pandas",
+    "future",
+]
+#    "enum34",
 
 setup(
     name="PIconnect",
-    version="0.9.1",
+    version="0.0.0",
     description="Python connector to OSIsoft PI SDK",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/x-rst",
     # Author details
-    author="Hugo Lapré",
-    author_email="hugo.lapre@brabantwater.nl",
-    url="https://github.com/Hugovdberg/PIconnect",
+    author="Niels Vanthillo",
+    author_email="nielsvanthillo@outlook.com",
+    url="https://github.com/nielsvth/PIconnect",
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
     packages=find_packages(include=["PIconnect"]),
@@ -71,36 +69,4 @@ setup(
     ],
     # What does your project relate to?
     keywords="OSIsoft PI ProcessInformation PIconnect",
-    # Alternatively, if you want to distribute just a my_module.py, uncomment
-    # this:
-    #   py_modules=["my_module"],
-    # List run-time dependencies here.  These will be installed by pip when
-    # your project is installed. For an analysis of "install_requires" vs pip's
-    # requirements files see:
-    # https://packaging.python.org/en/latest/requirements.html
-    # install_requires=['peppercorn'],
-    # List additional groups of dependencies here (e.g. development
-    # dependencies). You can install these using the following syntax,
-    # for example:
-    # $ pip install -e .[dev,test]
-    extras_require={"dev": ["check-manifest"], "test": ["coverage", "nose"]},
-    # If there are data files included in your packages that need to be
-    # installed, specify them here.  If using Python 2.6 or less, then these
-    # have to be included in MANIFEST.in as well.
-    package_data={
-        # 'sample': ['package_data.dat'],
-    },
-    # Although 'package_data' is the preferred approach, in some case you may
-    # need to place data files outside of your packages. See:
-    # http://docs.python.org/3.4/distutils/setupscript.html#installing-additional-files # noqa
-    # In this case, 'data_file' will be installed into '<sys.prefix>/my_data'
-    # data_files=[('my_data', ['data/data_file'])],
-    # To provide executable scripts, use entry points in preference to the
-    # "scripts" keyword. Entry points provide cross-platform support and allow
-    # pip to create the appropriate form of executable for the target platform.
-    # entry_points={
-    #     'console_scripts': [
-    #         'piconnect=PIconnect.cli:main'
-    #     ]
-    # },
 )

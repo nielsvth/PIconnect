@@ -1,0 +1,6 @@
+tzlocal
+numpy
+pytz
+pythonnet==2.5.1
+pandas
+future
