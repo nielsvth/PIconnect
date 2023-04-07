@@ -174,6 +174,8 @@ def calc_summary(
             raise AttributeError(
                 f"Duration of '{starttime - endtime}' exceeds the maximum allowed collection limit, please exclude event or reduce query duration"
             )
+        else:
+            raise AttributeError(e)
 
     df_final = pd.DataFrame()
     for x in result:  # per summary
