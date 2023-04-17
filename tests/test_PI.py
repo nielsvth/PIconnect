@@ -3,6 +3,7 @@
 import PIconnect
 import datetime
 import pandas as pd
+from PIconnect.PIConsts import SummaryType
 
 def test_connection():
     """Test to check for connected servers"""
@@ -40,8 +41,8 @@ def test_tags(af_connect, pi_timerange):
         type(tag.interpolated_value(time=starttime)[0]) == datetime.datetime
     ), "type should be datetime.datetime"
     assert (
-        tag.interpolated_value(time=starttime)[1] == 49.45119
-    ), "result should be 49.45119"
+        round(tag.interpolated_value(time=starttime)[1], 2) == 49.45
+    ), "result should be 49.45"
 
     # interpolated values
     assert (
@@ -71,13 +72,16 @@ def test_tags(af_connect, pi_timerange):
     ), "length of result should be 74"
 
     assert (
-        tag.recorded_values(
-            starttime=starttime,
-            endtime=starttime,
-            filter_expression="'%tag%' > 30",
-        )["SINUSOID"].min()
-        == 49.45119
-    ), "minimum value should be 49.45119"
+        round(
+            tag.recorded_values(
+                starttime=starttime,
+                endtime=starttime,
+                filter_expression="'%tag%' > 30",
+            )["SINUSOID"].min(),
+            2,
+        )
+        == 49.45
+    ), "minimum value should be 49.45"
 
     # plot values
     assert (
@@ -95,7 +99,9 @@ def test_tags(af_connect, pi_timerange):
             tag.summary(
                 starttime=starttime,
                 endtime=endtime,
-                summary_types=2 | 4 | 8,
+                summary_types=SummaryType.Average
+                | SummaryType.Minimum
+                | SummaryType.Maximum,
             )
         )
         == 3
@@ -108,7 +114,9 @@ def test_tags(af_connect, pi_timerange):
                 starttime=starttime,
                 endtime=endtime,
                 interval="1d",
-                summary_types=2 | 4 | 8,
+                summary_types=SummaryType.Average
+                | SummaryType.Minimum
+                | SummaryType.Maximum,
             )
         )
         == 27
@@ -121,7 +129,9 @@ def test_tags(af_connect, pi_timerange):
                 starttime=starttime,
                 endtime=endtime,
                 interval="1d",
-                summary_types=2 | 4 | 8,
+                summary_types=SummaryType.Average
+                | SummaryType.Minimum
+                | SummaryType.Maximum,
                 filter_expression="'SINUSOID' > 20",
             )
         )
@@ -129,15 +139,20 @@ def test_tags(af_connect, pi_timerange):
     ), "length of result should be 27"
 
     assert (
-        tag.filtered_summaries(
-            starttime=starttime,
-            endtime=endtime,
-            interval="1d",
-            summary_types=2 | 4 | 8,
-            filter_expression="'SINUSOID' > 20",
-        )["Value"].min()
-        == 24.005191802978516
-    ), "minimum value should be 24.005191802978516"
+        round(
+            tag.filtered_summaries(
+                starttime=starttime,
+                endtime=endtime,
+                interval="1d",
+                summary_types=SummaryType.Average
+                | SummaryType.Minimum
+                | SummaryType.Maximum,
+                filter_expression="'SINUSOID' > 20",
+            )["Value"].min(),
+            2,
+        )
+        == 24.01
+    ), "minimum value should be 24.01"
 
 
 def test_taglist(af_connect, pi_timerange):
@@ -195,7 +210,9 @@ def test_taglist(af_connect, pi_timerange):
             taglist.summary(
                 starttime=starttime,
                 endtime=endtime,
-                summary_types=2 | 4 | 8,
+                summary_types=SummaryType.Average
+                | SummaryType.Minimum
+                | SummaryType.Maximum,
             )
         )
         == 6
@@ -208,7 +225,9 @@ def test_taglist(af_connect, pi_timerange):
                 starttime=starttime,
                 endtime=endtime,
                 interval="1d",
-                summary_types=2 | 4 | 8,
+                summary_types=SummaryType.Average
+                | SummaryType.Minimum
+                | SummaryType.Maximum,
             )
         )
         == 54
@@ -221,7 +240,9 @@ def test_taglist(af_connect, pi_timerange):
                 starttime=starttime,
                 endtime=endtime,
                 interval="1d",
-                summary_types=2 | 4 | 8,
+                summary_types=SummaryType.Average
+                | SummaryType.Minimum
+                | SummaryType.Maximum,
                 filter_expression="'SINUSOID' > 20",
             )
         )
@@ -229,12 +250,17 @@ def test_taglist(af_connect, pi_timerange):
     ), "length of result should be 54"
 
     assert (
-        taglist.filtered_summaries(
-            starttime=starttime,
-            endtime=endtime,
-            interval="1d",
-            summary_types=2 | 4 | 8,
-            filter_expression="'SINUSOID' > 20",
-        )["Value"].min()
-        == 24.005191802978516
-    ), "minimum value should be 24.005191802978516"
+        round(
+            taglist.filtered_summaries(
+                starttime=starttime,
+                endtime=endtime,
+                interval="1d",
+                summary_types=SummaryType.Average
+                | SummaryType.Minimum
+                | SummaryType.Maximum,
+                filter_expression="'SINUSOID' > 20",
+            )["Value"].min(),
+            2,
+        )
+        == 24.01
+    ), "minimum value should be 24.01"

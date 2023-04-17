@@ -1,7 +1,7 @@
 """Unit Tests for calc.py Module""" ""
 
 import PIconnect
-import pandas as pd
+from PIconnect.PIConsts import SummaryType
 
 
 def test_connection():
@@ -60,7 +60,7 @@ def test_calc_interpol(calc_timerange):
         starttime="1-10-2022 14:00",
         endtime="1-10-2022 22:00",
         interval="100h",
-        summary_types=4 | 8,
+        summary_types= SummaryType.Minimum | SummaryType.Maximum,
         expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
     )
     assert len(calc3) == 2, "Table length should be 2"

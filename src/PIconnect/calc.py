@@ -89,11 +89,11 @@ def calc_summary(
     starttime: Union[str, datetime.datetime],
     endtime: Union[str, datetime.datetime],
     interval: str,
-    summary_types: int,
+    summary_types: SummaryType,
     expression: str = "",
-    calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
-    time_type: TimestampCalculation = TimestampCalculation.AUTO,
-    AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.EXPRESSION_RECORDED_VALUES,
+    calculation_basis: CalculationBasis = CalculationBasis.TimeWeighted ,
+    time_type: TimestampCalculation = TimestampCalculation.Auto,
+    AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.ExpressionRecordedValues,
     filter_interval: str = None,
 ) -> pd.DataFrame:
     """Return dataframe of summary measures of calculations specified in expression,
@@ -103,32 +103,27 @@ def calc_summary(
         starttime (Union[str, datetime.datetime]): start time
         endtime (Union[str, datetime.datetime]): end time
         interval (str): The bounding time for the evaluation period.
-        summary_types (int): integers separated by '|'. List given
-            below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+        summary_types (SummaryType object): SummaryType objects separated by '|'. List given
+                below. E.g. "summary_types = SummaryType.Minimum | SummaryType.Maximum"
+                Do not forget to import the SummaryType object from PIconnect.PIConsts
 
-            - TOTAL = 1: A total over the time span
-            - AVERAGE = 2: Average value over the time span
-            - MINIMUM = 4: The minimum value in the time span
-            - MAXIMUM = 8: The maximum value in the time span
-            - RANGE = 16: The range of the values (max-min) in the time
-                span
-            - STD_DEV = 32 : The sample standard deviation of the values
-                over the time span
-            - POP_STD_DEV = 64: The population standard deviation of the
-                values over the time span
-            - COUNT = 128: The sum of the event count (when the
-                calculation is event weighted). The sum of the event time
-                    duration (when the calculation is time weighted.)
-            - PERCENT_GOOD = 8192: The percentage of the data with a good
-                value over the time range. Based on time for time weighted
-                    calculations, based on event count for event weigthed
-                    calculations.
-            - TOTAL_WITH_UOM = 16384: The total over the time span, with
-                the unit of measurement that's associated with the input
-                (or no units if not defined for the input)
-            - ALL = 24831: A convenience to retrieve all summary types
-            - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
-                summary types for non-numeric data
+                - Total: A total over the time span
+                - Average: Average value over the time span
+                - Minimum: The minimum value in the time span
+                - Maximum: The maximum value in the time span
+                - Range: The range of the values (max-min) in the time span
+                - StdDev: The sample standard deviation of the values over the time span
+                - PopulationStdDev: The population standard deviation of the values over the time span
+                - Count: The sum of the event count (when the calculation is event weighted).
+                        The sum of the event time duration (when the calculation is time
+                        weighted.)
+                - PercentGood: The percentage of the data with a good value over the time range.
+                        Based on time for time weighted calculations, based on event count for
+                        event weigthed calculations.
+                - TotalWithUOM: The total over the time span, with the unit of measurement that's
+                        associated with the input (or no units if not defined for the input).
+                - All: A convenience to retrieve all summary types
+                - AllForNonNumeric: A convenience to retrieve all summary types for non-numeric data
 
         expression (raw string): A string containing the expression to be evaluated.
             The syntax for the expression generally follows the
@@ -136,12 +131,12 @@ def calc_summary(
             the PI Data Archive documentation.
         calculation_basis (CalculationBasis, optional): Basis by which to
             calculate the summary statistic.
-            Defaults to CalculationBasis.TIME_WEIGHTED.
+            Defaults to CalculationBasis.TimeWeighted .
         time_type (TimestampCalculation, optional): How the timestamp is
-            calculated. Defaults to TimestampCalculation.AUTO.
+            calculated. Defaults to TimestampCalculation.Auto.
         AFfilter_evaluation (ExpressionSampleType, optional): Expression
             Type. Defaults to
-            ExpressionSampleType.EXPRESSION_RECORDED_VALUES.
+            ExpressionSampleType.ExpressionRecordedValues.
 
     Returns:
         pd.DataFrame: dataframe of summary measures"""
@@ -174,10 +169,12 @@ def calc_summary(
             raise AttributeError(
                 f"Duration of '{starttime - endtime}' exceeds the maximum allowed collection limit, please exclude event or reduce query duration"
             )
+        else:
+            raise AttributeError(e)
 
     df_final = pd.DataFrame()
     for x in result:  # per summary
-        summary = SummaryType(x.Key).name
+        summary = x.Key
         values = [
             (timestamp_to_index(value.Timestamp.UtcTime), value.Value)
             for value in x.Value

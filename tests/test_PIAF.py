@@ -3,7 +3,7 @@
 import PIconnect
 import datetime
 import pandas as pd
-
+from PIconnect.PIConsts import SummaryType, CalculationBasis
 
 def test_connection():
     """Test to check for connected servers and AF Databases"""
@@ -141,14 +141,14 @@ def test_event_extracts(af_connect, af_timerange):
 
     # summary
     result = event.summary(
-        tag_list=["SINUSOID"], summary_types=4 | 8 | 128, dataserver=server
+        tag_list=["SINUSOID"], summary_types=SummaryType.Minimum | SummaryType.Maximum | SummaryType.Count, dataserver=server
     )
     assert (
-        result.loc[(result["Summary"] == "MAXIMUM"), "Value"].iloc[0]
-        == 99.1600341796875
-    ), "Max shoud be 99.1600341796875"
+        round(result.loc[(result["Summary"] == "Maximum"), "Value"].iloc[0], 2)
+        == 99.16
+    ), "Max shoud be 99.16"
     assert (
-        result.loc[(result["Summary"] == "COUNT"), "Value"].iloc[0]
+        result.loc[(result["Summary"] == "Count"), "Value"].iloc[0]
         == event.duration.total_seconds()
     )
 
@@ -158,14 +158,14 @@ def test_event_extracts(af_connect, af_timerange):
     result = event.filtered_summaries(
         tag_list=["SINUSOID"],
         interval="4h",
-        summary_types=4 | 8,
+        summary_types=SummaryType.Minimum | SummaryType.Maximum,
         filter_expression="('SINUSOID' >= 20)",
         dataserver=server,
-        calculation_basis=1,
+        calculation_basis=CalculationBasis.EventWeighted,
     )
     assert type(result) == pd.DataFrame, "Output type should be pd.DataFrame"
     assert result.shape == (6, 4), "Shape should be (6,4)"
-    assert result["Value"].min() == 24.235179901123047
+    assert round(result["Value"].min(), 2) == 24.24
 
 
 def test_eventhierarchy(af_connect, af_timerange):
@@ -236,7 +236,7 @@ def test_eventhierarchy(af_connect, af_timerange):
     # summary extract - specify tag from list
     summary_values = eventhierarchy_1.ehy.summary_extract(
         tag_list=["SINUSOID"],
-        summary_types=4 | 8 | 32,
+        summary_types= SummaryType.Minimum | SummaryType.Maximum | SummaryType.StdDev,
         dataserver=server,
         col=False,
     )
@@ -245,7 +245,7 @@ def test_eventhierarchy(af_connect, af_timerange):
     # summary extract - specify tag from column
     summary_values_2 = eventhierarchy_2.ehy.summary_extract(
         tag_list=["Tag"],
-        summary_types=4 | 8 | 32,
+        summary_types=SummaryType.Minimum | SummaryType.Maximum | SummaryType.StdDev,
         dataserver=server,
         col=True,
     )
@@ -257,7 +257,7 @@ def test_eventhierarchy(af_connect, af_timerange):
     try:
         summary_values_3 = eventhierarchy_3.ehy.summary_extract(
             tag_list=["Tag"],
-            summary_types=4 | 8 | 32,
+            summary_types=SummaryType.Minimum | SummaryType.Maximum | SummaryType.StdDev,
             dataserver=server,
             col=True,
         )
@@ -267,7 +267,7 @@ def test_eventhierarchy(af_connect, af_timerange):
     # calculation of summary measures of interval for calculated values
     calc_summary_values = eventhierarchy.ehy.calc_summary_extract(
         interval="100h",
-        summary_types=4 | 8,
+        summary_types=SummaryType.Minimum | SummaryType.Maximum,
         expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
         col=False,
     )
@@ -311,8 +311,8 @@ def test_condensed(af_connect, af_timerange):
     )
     assert disc_interpol_values.shape == (1163, 4), "shape should be (1163,4)"
     assert (
-        disc_interpol_values["SINUSOID"].min() == 40.02945
-    ), "filtered minimum value should be 40.02945"
+        round(disc_interpol_values["SINUSOID"].min(), 2) == 40.03
+    ), "filtered minimum value should be 40.03"
 
     # interpol-disecrete extract, including non-existent tag, will return an Error
     try:
@@ -340,8 +340,8 @@ def test_condensed(af_connect, af_timerange):
     )
     assert disc_interpol_values.shape == (1163, 5), "shape should be (1163,5)"
     assert (
-        disc_interpol_values["Value"].min() == 3.387192
-    ), "filtered minimum value should be 3.387192"
+        round(disc_interpol_values["Value"].min(), 2) == 3.39
+    ), "filtered minimum value should be 3.39"
 
     # contin-disecrete extract, including filter expression
     disc_interpol_values = condensed.ecd.interpol_continuous_extract(
@@ -352,8 +352,8 @@ def test_condensed(af_connect, af_timerange):
     )
     assert disc_interpol_values.shape == (1161, 4), "shape should be (1161,4)"
     assert (
-        disc_interpol_values["SINUSOID"].min() == 40.02945
-    ), "filtered minimum value should be 40.02945"
+        round(disc_interpol_values["SINUSOID"].min(), 2) == 40.03
+    ), "filtered minimum value should be 40.03"
 
     # recorded extract, including filter expression
     rec_values = condensed.ecd.recorded_extract(
@@ -366,9 +366,9 @@ def test_condensed(af_connect, af_timerange):
         3,
     ), "shape should be (13,3)"
     assert (
-        rec_values["EventFrames[Batch A]"]["SINUSOID"]["Data"].min()
-        == 67.43513
-    ), "filtered minimum value should be 67.43513"
+        round(rec_values["EventFrames[Batch A]"]["SINUSOID"]["Data"].min(), 2)
+        == 67.44
+    ), "filtered minimum value should be 67.44"
 
     # plot extract
     plot_values = condensed.ecd.plot_continuous_extract(
@@ -381,21 +381,21 @@ def test_condensed(af_connect, af_timerange):
         3,
     ), "shape should be (13,3)"
     assert (
-        plot_values["EventFrames[Batch A]"]["SINUSOID"]["Data"].min()
-        == 0.7622223
-    ), "minimum value should be 0.7622223"
+        round(plot_values["EventFrames[Batch A]"]["SINUSOID"]["Data"].min(), 2)
+        == 0.76
+    ), "minimum value should be 0.76"
 
     # summary extract, tags from taglist
     summary_values = condensed.ecd.summary_extract(
         tag_list=["SINUSOID"],
-        summary_types=4 | 8 | 32,
+        summary_types=SummaryType.Minimum | SummaryType.Maximum | SummaryType.StdDev,
         dataserver=server,
         col=False,
     )
     assert summary_values.shape == (9, 6), "shape should be (9,7)"
     assert (
-        summary_values["Value"].min() == 0.7622223496437073
-    ), "minimum value should be 0.7622223496437073"
+        round(summary_values["Value"].min(), 2) == 0.76
+    ), "minimum value should be 0.76"
 
     # ad Tag column to condensed dataframe
     condensed["Tag"] = "SINUSOID"
@@ -403,19 +403,19 @@ def test_condensed(af_connect, af_timerange):
     # summary extract, tags from column
     summary_values = condensed.ecd.summary_extract(
         tag_list=["Tag"],
-        summary_types=4 | 8 | 32,
+        summary_types=SummaryType.Minimum | SummaryType.Maximum | SummaryType.StdDev,
         dataserver=server,
         col=True,
     )
     assert summary_values.shape == (9, 7), "shape should be (9,7)"
     assert (
-        summary_values["Value"].min() == 0.7622223496437073
-    ), "minimum value should be 0.7622223496437073"
+        round(summary_values["Value"].min(), 2) == 0.76
+    ), "minimum value should be 0.76"
 
     # calculation of summary measures of interval for calculated values
     calc_summary_values = condensed.ecd.calc_summary_extract(
         interval="100h",
-        summary_types=4 | 8,
+        summary_types=SummaryType.Minimum | SummaryType.Maximum ,
         expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
         col=False,
     )

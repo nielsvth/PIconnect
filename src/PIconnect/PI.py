@@ -100,7 +100,7 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
         username=None,
         password=None,
         domain=None,
-        authentication_mode=AuthenticationMode.PI_USER_AUTHENTICATION,
+        authentication_mode=AuthenticationMode.PIUserAuthentication,
         timeout=None,
     ):
         if server and server not in self.servers:
@@ -126,7 +126,7 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
             cred = [username, secure_pass] + ([domain] if domain else [])
             self._credentials = (
                 NetworkCredential(*cred),
-                int(authentication_mode),
+                authentication_mode,
             )
         else:
             self._credentials = None
@@ -350,7 +350,7 @@ class Tag:
     @property
     def pointtype_desc(self):
         """Return the pointtype"""
-        return str(PIPointType(self.pointtype))
+        return self.tag.pointtype.ToString()
 
     # Methods
     def current_value(self) -> int:
@@ -421,7 +421,7 @@ class Tag:
         starttime: Union[str, datetime.datetime],
         endtime: Union[str, datetime.datetime],
         filter_expression: str = "",
-        AFBoundaryType=BoundaryType.INTERPOLATED,
+        AFBoundaryType=BoundaryType.Interpolated,
     ) -> pd.DataFrame:
         """Retrieve recorded data across a time range and specified
         using optional expression.
@@ -432,7 +432,7 @@ class Tag:
             filter_expression (str, optional): Filter expression.
                 Defaults to "".
             AFBoundaryType (_type_, optional): Defined Boundary type.
-                Defaults to BoundaryType.INTERPOLATED.
+                Defaults to BoundaryType.Interpolated.
 
         Returns:
             pd.DataFrame: resultant dataframe
@@ -506,7 +506,7 @@ class Tag:
             df = pd.DataFrame()
         return df
 
-    def _parseSummaryResult(self, result: SummaryType) -> pd.DataFrame:
+    def _parseSummaryResult(self, result) -> pd.DataFrame:
         """Parse a Summary result and return a dataframe.
 
         Args:
@@ -518,7 +518,7 @@ class Tag:
         # summary
         df_final = pd.DataFrame()
         for x in result:  # per summary
-            summary = SummaryType(x.Key).name
+            summary = x.ToString().replace('[','').split(',')[0]
             value = x.Value
             timestamp = timestamp_to_index(x.Value.Timestamp.UtcTime)
             df = pd.DataFrame(
@@ -529,7 +529,7 @@ class Tag:
 
         return df_final
 
-    def _parseSummariesResult(self, result: SummaryType) -> pd.DataFrame:
+    def _parseSummariesResult(self, result) -> pd.DataFrame:
         """Parse a Summaries result and return a dataframe.
 
         Args:
@@ -541,7 +541,7 @@ class Tag:
         # summaries
         df_final = pd.DataFrame()
         for x in result:  # per summary
-            summary = SummaryType(x.Key).name
+            summary = x.ToString().replace('[','').split(',')[0]
             values = [
                 (timestamp_to_index(value.Timestamp.UtcTime), value.Value)
                 for value in x.Value
@@ -564,9 +564,9 @@ class Tag:
         self,
         starttime: Union[str, datetime.datetime],
         endtime: Union[str, datetime.datetime],
-        summary_types: int,
-        calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
-        time_type: TimestampCalculation = TimestampCalculation.AUTO,
+        summary_types: SummaryType,
+        calculation_basis: CalculationBasis = CalculationBasis.TimeWeighted,
+        time_type: TimestampCalculation = TimestampCalculation.Auto,
     ) -> pd.DataFrame:
         """Return specified summary measure(s) for Tag within the specified
         timeframe
@@ -574,38 +574,33 @@ class Tag:
         Args:
             starttime (Union[str, datetime.datetime]): start time
             endtime (Union[str, datetime.datetime]): end time
-            summary_types (int): integers separated by '|'. List given
-                below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+            summary_types (SummaryType object): SummaryType objects separated by '|'. List given
+                below. E.g. "summary_types = SummaryType.Minimum | SummaryType.Maximum"
+                Do not forget to import the SummaryType object from PIconnect.PIConsts
 
-                - TOTAL = 1: A total over the time span
-                - AVERAGE = 2: Average value over the time span
-                - MINIMUM = 4: The minimum value in the time span
-                - MAXIMUM = 8: The maximum value in the time span
-                - RANGE = 16: The range of the values (max-min) in the time
-                    span
-                - STD_DEV = 32 : The sample standard deviation of the values
-                    over the time span
-                - POP_STD_DEV = 64: The population standard deviation of the
-                    values over the time span
-                - COUNT = 128: The sum of the event count (when the
-                    calculation is event weighted). The sum of the event time
-                        duration (when the calculation is time weighted.)
-                - PERCENT_GOOD = 8192: The percentage of the data with a good
-                    value over the time range. Based on time for time weighted
-                        calculations, based on event count for event weigthed
-                        calculations.
-                - TOTAL_WITH_UOM = 16384: The total over the time span, with
-                    the unit of measurement that's associated with the input
-                    (or no units if not defined for the input)
-                - ALL = 24831: A convenience to retrieve all summary types
-                - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
-                    summary types for non-numeric data
+                - Total: A total over the time span
+                - Average: Average value over the time span
+                - Minimum: The minimum value in the time span
+                - Maximum: The maximum value in the time span
+                - Range: The range of the values (max-min) in the time span
+                - StdDev: The sample standard deviation of the values over the time span
+                - PopulationStdDev: The population standard deviation of the values over the time span
+                - Count: The sum of the event count (when the calculation is event weighted).
+                        The sum of the event time duration (when the calculation is time
+                        weighted.)
+                - PercentGood: The percentage of the data with a good value over the time range.
+                        Based on time for time weighted calculations, based on event count for
+                        event weigthed calculations.
+                - TotalWithUOM: The total over the time span, with the unit of measurement that's
+                        associated with the input (or no units if not defined for the input).
+                - All: A convenience to retrieve all summary types
+                - AllForNonNumeric: A convenience to retrieve all summary types for non-numeric data
 
             calculation_basis (CalculationBasis, optional): Basis by which to
                 calculate the summary statistic.
-                Defaults to CalculationBasis.TIME_WEIGHTED.
+                Defaults to CalculationBasis.TimeWeighted.
             time_type (TimestampCalculation, optional): How the timestamp is
-                calculated. Defaults to TimestampCalculation.AUTO.
+                calculated. Defaults to TimestampCalculation.Auto.
 
         Returns:
             pd.DataFrame: Dataframe with requested summary statistics
@@ -625,9 +620,9 @@ class Tag:
         starttime: Union[str, datetime.datetime],
         endtime: Union[str, datetime.datetime],
         interval: str,
-        summary_types: int,
-        calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
-        time_type: TimestampCalculation = TimestampCalculation.AUTO,
+        summary_types: SummaryType,
+        calculation_basis: CalculationBasis = CalculationBasis.TimeWeighted,
+        time_type: TimestampCalculation = TimestampCalculation.Auto,
     ) -> pd.DataFrame:
         """Return specified summary measure(s) for each interval within the
         specified timeframe
@@ -636,44 +631,39 @@ class Tag:
             starttime (Union[str, datetime.datetime]): start time
             endtime (Union[str, datetime.datetime]): end time
             interval (str): interval to interpolate to
-            summary_types (int): integers separated by '|'. List given
-                below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+            summary_types (SummaryType object): SummaryType objects separated by '|'. List given
+                below. E.g. "summary_types = SummaryType.Minimum | SummaryType.Maximum"
+                Do not forget to import the SummaryType object from PIconnect.PIConsts
 
-                - TOTAL = 1: A total over the time span
-                - AVERAGE = 2: Average value over the time span
-                - MINIMUM = 4: The minimum value in the time span
-                - MAXIMUM = 8: The maximum value in the time span
-                - RANGE = 16: The range of the values (max-min) in the time
-                    span
-                - STD_DEV = 32 : The sample standard deviation of the values
-                    over the time span
-                - POP_STD_DEV = 64: The population standard deviation of the
-                    values over the time span
-                - COUNT = 128: The sum of the event count (when the
-                    calculation is event weighted). The sum of the event time
-                        duration (when the calculation is time weighted.)
-                - PERCENT_GOOD = 8192: The percentage of the data with a good
-                    value over the time range. Based on time for time weighted
-                        calculations, based on event count for event weigthed
-                        calculations.
-                - TOTAL_WITH_UOM = 16384: The total over the time span, with
-                    the unit of measurement that's associated with the input
-                    (or no units if not defined for the input)
-                - ALL = 24831: A convenience to retrieve all summary types
-                - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
-                    summary types for non-numeric data
+                - Total: A total over the time span
+                - Average: Average value over the time span
+                - Minimum: The minimum value in the time span
+                - Maximum: The maximum value in the time span
+                - Range: The range of the values (max-min) in the time span
+                - StdDev: The sample standard deviation of the values over the time span
+                - PopulationStdDev: The population standard deviation of the values over the time span
+                - Count: The sum of the event count (when the calculation is event weighted).
+                        The sum of the event time duration (when the calculation is time
+                        weighted.)
+                - PercentGood: The percentage of the data with a good value over the time range.
+                        Based on time for time weighted calculations, based on event count for
+                        event weigthed calculations.
+                - TotalWithUOM: The total over the time span, with the unit of measurement that's
+                        associated with the input (or no units if not defined for the input).
+                - All: A convenience to retrieve all summary types
+                - AllForNonNumeric: A convenience to retrieve all summary types for non-numeric data
 
             calculation_basis (CalculationBasis, optional): Basis by which to
                 calculate the summary statistic.
-                Defaults to CalculationBasis.TIME_WEIGHTED.
+                Defaults to CalculationBasis.TimeWeighted.
             time_type (TimestampCalculation, optional): How the timestamp is
-                calculated. Defaults to TimestampCalculation.AUTO.
+                calculated. Defaults to TimestampCalculation.Auto.
 
         Returns:
             pd.DataFrame: Dataframe with requested summary statistics
         """
         AFTimeRange = to_af_time_range(starttime, endtime)
-        if interval == 'event':
+        if interval == "event":
             AFInterval = AF.Time.AFTimeSpan(AFTimeRange.Span)
         else:
             AFInterval = AF.Time.AFTimeSpan.Parse(interval)
@@ -695,11 +685,11 @@ class Tag:
         starttime: Union[str, datetime.datetime],
         endtime: Union[str, datetime.datetime],
         interval: str,
-        summary_types: int,
+        summary_types: SummaryType,
         filter_expression: str,
-        calculation_basis: CalculationBasis = CalculationBasis.EVENT_WEIGHTED,
-        time_type: TimestampCalculation = TimestampCalculation.AUTO,
-        AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.EXPRESSION_RECORDED_VALUES,  # noqa
+        calculation_basis: CalculationBasis = CalculationBasis.EventWeighted,
+        time_type: TimestampCalculation = TimestampCalculation.Auto,
+        AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.ExpressionRecordedValues,  # noqa
         filter_interval: str = None,
     ) -> pd.DataFrame:
         """Return one or more summary values for each interval, within a
@@ -710,49 +700,44 @@ class Tag:
             starttime (Union[str, datetime.datetime]): start time
             endtime (Union[str, datetime.datetime]): end time
             interval (str): interval to interpolate to
-            summary_types (int): integers separated by '|'. List given
-                below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+            summary_types (SummaryType object): SummaryType objects separated by '|'. List given
+                below. E.g. "summary_types = SummaryType.Minimum | SummaryType.Maximum"
+                Do not forget to import the SummaryType object from PIconnect.PIConsts
 
-                - TOTAL = 1: A total over the time span
-                - AVERAGE = 2: Average value over the time span
-                - MINIMUM = 4: The minimum value in the time span
-                - MAXIMUM = 8: The maximum value in the time span
-                - RANGE = 16: The range of the values (max-min) in the time
-                    span
-                - STD_DEV = 32 : The sample standard deviation of the values
-                    over the time span
-                - POP_STD_DEV = 64: The population standard deviation of the
-                    values over the time span
-                - COUNT = 128: The sum of the event count (when the
-                    calculation is event weighted). The sum of the event time
-                        duration (when the calculation is time weighted.)
-                - PERCENT_GOOD = 8192: The percentage of the data with a good
-                    value over the time range. Based on time for time weighted
-                        calculations, based on event count for event weigthed
-                        calculations.
-                - TOTAL_WITH_UOM = 16384: The total over the time span, with
-                    the unit of measurement that's associated with the input
-                    (or no units if not defined for the input)
-                - ALL = 24831: A convenience to retrieve all summary types
-                - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
-                    summary types for non-numeric data
+                - Total: A total over the time span
+                - Average: Average value over the time span
+                - Minimum: The minimum value in the time span
+                - Maximum: The maximum value in the time span
+                - Range: The range of the values (max-min) in the time span
+                - StdDev: The sample standard deviation of the values over the time span
+                - PopulationStdDev: The population standard deviation of the values over the time span
+                - Count: The sum of the event count (when the calculation is event weighted).
+                        The sum of the event time duration (when the calculation is time
+                        weighted.)
+                - PercentGood: The percentage of the data with a good value over the time range.
+                        Based on time for time weighted calculations, based on event count for
+                        event weigthed calculations.
+                - TotalWithUOM: The total over the time span, with the unit of measurement that's
+                        associated with the input (or no units if not defined for the input).
+                - All: A convenience to retrieve all summary types
+                - AllForNonNumeric: A convenience to retrieve all summary types for non-numeric data
 
             filter_expression (str):  Filter expression.
             calculation_basis (CalculationBasis, optional): Basis by which to
                 calculate the summary statistic.
-                Defaults to CalculationBasis.EVENT_WEIGHTED.
+                Defaults to CalculationBasis.EventWeighted.
             time_type (TimestampCalculation, optional): How the timestamp is
-                calculated. Defaults to TimestampCalculation.AUTO.
+                calculated. Defaults to TimestampCalculation.Auto.
             AFfilter_evaluation (ExpressionSampleType, optional): Expression
                 Type. Defaults to
-                ExpressionSampleType.EXPRESSION_RECORDED_VALUES.
+                ExpressionSampleType.ExpressionRecordedValues.
             filter_interval (str, optional): _description_. Defaults to None.
 
         Returns:
             pd.DataFrame: Dataframe with requested summary statistics
         """
         AFTimeRange = to_af_time_range(starttime, endtime)
-        if interval == 'event':
+        if interval == "event":
             AFInterval = AF.Time.AFTimeSpan(AFTimeRange.Span)
         else:
             AFInterval = AF.Time.AFTimeSpan.Parse(interval)
@@ -876,12 +861,13 @@ class TagList(UserList):
 
         if result:
             # process query results
-            data = list(result.ResultQueue.GetConsumingEnumerable())
-            data = [list(series) for series in data]
+            data1 = [x for x in result.GetEnumerator()]
+            PointList = [point.PIPoint for point in data1]
+            data2 = [list(series) for series in data1]
 
             dct = {}
-            tags = [tag.Name for tag in result.PointList]
-            for i, lst in enumerate(data):
+            tags = [tag.Name for tag in PointList]
+            for i, lst in enumerate(data2):
                 df = pd.DataFrame([lst]).T
                 df.columns = ["Data"]
                 # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
@@ -935,10 +921,11 @@ class TagList(UserList):
 
         if result:
             # process query results
-            data = list(result.ResultQueue.GetConsumingEnumerable())
-            data = [list(series) for series in data]
-            df = pd.DataFrame(data).T
-            df.columns = [tag.Name for tag in result.PointList]
+            data1 = [x for x in result.GetEnumerator()]
+            PointList = [point.PIPoint for point in data1]
+            data2 = [list(series) for series in data1]
+            df = pd.DataFrame(data2).T
+            df.columns = [tag.Name for tag in PointList]
             # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm # noqa
             df.index = df[df.columns[0]].apply(
                 lambda x: timestamp_to_index(x.Timestamp.UtcTime)
@@ -956,7 +943,7 @@ class TagList(UserList):
         starttime: Union[str, datetime.datetime],
         endtime: Union[str, datetime.datetime],
         filter_expression: str = "",
-        AFBoundaryType: BoundaryType = BoundaryType.INTERPOLATED,
+        AFBoundaryType: BoundaryType = BoundaryType.Interpolated,
         paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
             AF.PI.PIPageType.TagCount, 1000
         ),
@@ -969,7 +956,7 @@ class TagList(UserList):
             filter_expression (str, optional): Filter expression.
                 Defaults to "".
             AFBoundaryType (BoundaryType, optional): Defined BoundaryType.
-                Defaults to BoundaryType.INTERPOLATED.
+                Defaults to BoundaryType.Interpolated.
 
         Returns:
             Dict[str, pd.DataFrame]: tag Name: dataframe of data
@@ -992,12 +979,13 @@ class TagList(UserList):
 
         if result:
             # process query results
-            data = list(result.ResultQueue.GetConsumingEnumerable())
-            data = [list(series) for series in data]
+            data1 = [x for x in result.GetEnumerator()]
+            PointList = [point.PIPoint for point in data1]
+            data2 = [list(series) for series in data1]
 
             dct = {}
-            tags = [tag.Name for tag in result.PointList]
-            for i, lst in enumerate(data):
+            tags = [tag.Name for tag in PointList]
+            for i, lst in enumerate(data2):
                 df = pd.DataFrame([lst]).T
                 df.columns = ["Data"]
                 # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm # noqa
@@ -1016,9 +1004,9 @@ class TagList(UserList):
         self,
         starttime: Union[str, datetime.datetime],
         endtime: Union[str, datetime.datetime],
-        summary_types: int,
-        calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
-        time_type: TimestampCalculation = TimestampCalculation.AUTO,
+        summary_types: SummaryType,
+        calculation_basis: CalculationBasis = CalculationBasis.TimeWeighted,
+        time_type: TimestampCalculation = TimestampCalculation.Auto,
         paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
             AF.PI.PIPageType.TagCount, 1000
         ),
@@ -1029,38 +1017,33 @@ class TagList(UserList):
         Args:
             starttime (Union[str, datetime.datetime]): start time
             endtime (Union[str, datetime.datetime]): end time
-            summary_types (int): integers separated by '|'. List given
-                below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+            summary_types (SummaryType object): SummaryType objects separated by '|'. List given
+                below. E.g. "summary_types = SummaryType.Minimum | SummaryType.Maximum"
+                Do not forget to import the SummaryType object from PIconnect.PIConsts
 
-                - TOTAL = 1: A total over the time span
-                - AVERAGE = 2: Average value over the time span
-                - MINIMUM = 4: The minimum value in the time span
-                - MAXIMUM = 8: The maximum value in the time span
-                - RANGE = 16: The range of the values (max-min) in the time
-                    span
-                - STD_DEV = 32 : The sample standard deviation of the values
-                    over the time span
-                - POP_STD_DEV = 64: The population standard deviation of the
-                    values over the time span
-                - COUNT = 128: The sum of the event count (when the
-                    calculation is event weighted). The sum of the event time
-                        duration (when the calculation is time weighted.)
-                - PERCENT_GOOD = 8192: The percentage of the data with a good
-                    value over the time range. Based on time for time weighted
-                        calculations, based on event count for event weigthed
-                        calculations.
-                - TOTAL_WITH_UOM = 16384: The total over the time span, with
-                    the unit of measurement that's associated with the input
-                    (or no units if not defined for the input)
-                - ALL = 24831: A convenience to retrieve all summary types
-                - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
-                    summary types for non-numeric data
+                - Total: A total over the time span
+                - Average: Average value over the time span
+                - Minimum: The minimum value in the time span
+                - Maximum: The maximum value in the time span
+                - Range: The range of the values (max-min) in the time span
+                - StdDev: The sample standard deviation of the values over the time span
+                - PopulationStdDev: The population standard deviation of the values over the time span
+                - Count: The sum of the event count (when the calculation is event weighted).
+                        The sum of the event time duration (when the calculation is time
+                        weighted.)
+                - PercentGood: The percentage of the data with a good value over the time range.
+                        Based on time for time weighted calculations, based on event count for
+                        event weigthed calculations.
+                - TotalWithUOM: The total over the time span, with the unit of measurement that's
+                        associated with the input (or no units if not defined for the input).
+                - All: A convenience to retrieve all summary types
+                - AllForNonNumeric: A convenience to retrieve all summary types for non-numeric data
 
             calculation_basis (CalculationBasis, optional): Basis by which to
                 calculate the summary statistic.
-                Defaults to CalculationBasis.TIME_WEIGHTED.
+                Defaults to CalculationBasis.TimeWeighted.
             time_type (TimestampCalculation, optional): How the timestamp is
-                calculated. Defaults to TimestampCalculation.AUTO.
+                calculated. Defaults to TimestampCalculation.Auto.
 
         Returns:
             pd.DataFrame: Dataframe with requested summary statistics
@@ -1081,7 +1064,7 @@ class TagList(UserList):
             df_final = pd.DataFrame()
             for x in data:  # per tag
                 point = [y.PIPoint.Name for y in x.Values][0]
-                summaries = [SummaryType(y).name for y in x.Keys]
+                summaries = [y.ToString().replace('[','').split(',')[0] for y in x]
                 values = [
                     [y.Value, timestamp_to_index(y.Timestamp.UtcTime)]
                     for y in x.Values
@@ -1101,9 +1084,9 @@ class TagList(UserList):
         starttime: Union[str, datetime.datetime],
         endtime: Union[str, datetime.datetime],
         interval: str,
-        summary_types: int,
-        calculation_basis: CalculationBasis = CalculationBasis.TIME_WEIGHTED,
-        time_type: TimestampCalculation = TimestampCalculation.AUTO,
+        summary_types: SummaryType,
+        calculation_basis: CalculationBasis = CalculationBasis.TimeWeighted,
+        time_type: TimestampCalculation = TimestampCalculation.Auto,
         paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
             AF.PI.PIPageType.TagCount, 1000
         ),
@@ -1115,45 +1098,40 @@ class TagList(UserList):
             starttime (Union[str, datetime.datetime]): start time
             endtime (Union[str, datetime.datetime]): end time
             interval (str): interval to interpolate to
-            summary_types (int): integers separated by '|'. List given
-                below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+            summary_types (SummaryType object): SummaryType objects separated by '|'. List given
+                below. E.g. "summary_types = SummaryType.Minimum | SummaryType.Maximum"
+                Do not forget to import the SummaryType object from PIconnect.PIConsts
 
-                - TOTAL = 1: A total over the time span
-                - AVERAGE = 2: Average value over the time span
-                - MINIMUM = 4: The minimum value in the time span
-                - MAXIMUM = 8: The maximum value in the time span
-                - RANGE = 16: The range of the values (max-min) in the time
-                    span
-                - STD_DEV = 32 : The sample standard deviation of the values
-                    over the time span
-                - POP_STD_DEV = 64: The population standard deviation of the
-                    values over the time span
-                - COUNT = 128: The sum of the event count (when the
-                    calculation is event weighted). The sum of the event time
-                        duration (when the calculation is time weighted.)
-                - PERCENT_GOOD = 8192: The percentage of the data with a good
-                    value over the time range. Based on time for time weighted
-                        calculations, based on event count for event weigthed
-                        calculations.
-                - TOTAL_WITH_UOM = 16384: The total over the time span, with
-                    the unit of measurement that's associated with the input
-                    (or no units if not defined for the input)
-                - ALL = 24831: A convenience to retrieve all summary types
-                - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
-                    summary types for non-numeric data
+                - Total: A total over the time span
+                - Average: Average value over the time span
+                - Minimum: The minimum value in the time span
+                - Maximum: The maximum value in the time span
+                - Range: The range of the values (max-min) in the time span
+                - StdDev: The sample standard deviation of the values over the time span
+                - PopulationStdDev: The population standard deviation of the values over the time span
+                - Count: The sum of the event count (when the calculation is event weighted).
+                        The sum of the event time duration (when the calculation is time
+                        weighted.)
+                - PercentGood: The percentage of the data with a good value over the time range.
+                        Based on time for time weighted calculations, based on event count for
+                        event weigthed calculations.
+                - TotalWithUOM: The total over the time span, with the unit of measurement that's
+                        associated with the input (or no units if not defined for the input).
+                - All: A convenience to retrieve all summary types
+                - AllForNonNumeric: A convenience to retrieve all summary types for non-numeric data
 
             calculation_basis (CalculationBasis, optional): Basis by which to
                 calculate the summary statistic.
-                Defaults to CalculationBasis.TIME_WEIGHTED.
+                Defaults to CalculationBasis.TimeWeighted.
             time_type (TimestampCalculation, optional): How the timestamp is
-                calculated. Defaults to TimestampCalculation.AUTO.
+                calculated. Defaults to TimestampCalculation.Auto.
 
         Returns:
             pd.DataFrame: Dataframe with requested summary statistics
         """
         PIPointlist = generate_pipointlist(self)
         AFTimeRange = to_af_time_range(starttime, endtime)
-        if interval == 'event':
+        if interval == "event":
             AFInterval = AF.Time.AFTimeSpan(AFTimeRange.Span)
         else:
             AFInterval = AF.Time.AFTimeSpan.Parse(interval)
@@ -1185,9 +1163,10 @@ class TagList(UserList):
                         for value in x[key]
                     ]
                 )
-                df["Summary"] = df["Summary"].apply(
-                    lambda x: SummaryType(x).name
-                )
+                df["Summary"] = df["Summary"].replace(
+                    [y for y in x.Keys], 
+                    [y.ToString().replace('[','').split(',')[0] for y in x]
+                    )
                 df = df.explode("Timestamp")
                 df[["Timestamp", "Value"]] = df["Timestamp"].apply(
                     pd.Series
@@ -1204,11 +1183,11 @@ class TagList(UserList):
         starttime: Union[str, datetime.datetime],
         endtime: Union[str, datetime.datetime],
         interval: str,
-        summary_types: int,
+        summary_types: SummaryType,
         filter_expression: str,
-        calculation_basis: CalculationBasis = CalculationBasis.EVENT_WEIGHTED,
-        time_type: TimestampCalculation = TimestampCalculation.AUTO,
-        AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.EXPRESSION_RECORDED_VALUES,  # noqa
+        calculation_basis: CalculationBasis = CalculationBasis.EventWeighted,
+        time_type: TimestampCalculation = TimestampCalculation.Auto,
+        AFfilter_evaluation: ExpressionSampleType = ExpressionSampleType.ExpressionRecordedValues,  # noqa
         filter_interval: str = None,
         paging_config: AF.PI.PIPagingConfiguration = AF.PI.PIPagingConfiguration(
             AF.PI.PIPageType.TagCount, 1000
@@ -1222,42 +1201,37 @@ class TagList(UserList):
             starttime (Union[str, datetime.datetime]): start time
             endtime (Union[str, datetime.datetime]): end time
             interval (str): interval to interpolate to
-            summary_types (int): integers separated by '|'. List given
-                below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+            summary_types (SummaryType object): SummaryType objects separated by '|'. List given
+                below. E.g. "summary_types = SummaryType.Minimum | SummaryType.Maximum"
+                Do not forget to import the SummaryType object from PIconnect.PIConsts
 
-                - TOTAL = 1: A total over the time span
-                - AVERAGE = 2: Average value over the time span
-                - MINIMUM = 4: The minimum value in the time span
-                - MAXIMUM = 8: The maximum value in the time span
-                - RANGE = 16: The range of the values (max-min) in the time
-                    span
-                - STD_DEV = 32 : The sample standard deviation of the values
-                    over the time span
-                - POP_STD_DEV = 64: The population standard deviation of the
-                    values over the time span
-                - COUNT = 128: The sum of the event count (when the
-                    calculation is event weighted). The sum of the event time
-                        duration (when the calculation is time weighted.)
-                - PERCENT_GOOD = 8192: The percentage of the data with a good
-                    value over the time range. Based on time for time weighted
-                        calculations, based on event count for event weigthed
-                        calculations.
-                - TOTAL_WITH_UOM = 16384: The total over the time span, with
-                    the unit of measurement that's associated with the input
-                    (or no units if not defined for the input)
-                - ALL = 24831: A convenience to retrieve all summary types
-                - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
-                    summary types for non-numeric data
+                - Total: A total over the time span
+                - Average: Average value over the time span
+                - Minimum: The minimum value in the time span
+                - Maximum: The maximum value in the time span
+                - Range: The range of the values (max-min) in the time span
+                - StdDev: The sample standard deviation of the values over the time span
+                - PopulationStdDev: The population standard deviation of the values over the time span
+                - Count: The sum of the event count (when the calculation is event weighted).
+                        The sum of the event time duration (when the calculation is time
+                        weighted.)
+                - PercentGood: The percentage of the data with a good value over the time range.
+                        Based on time for time weighted calculations, based on event count for
+                        event weigthed calculations.
+                - TotalWithUOM: The total over the time span, with the unit of measurement that's
+                        associated with the input (or no units if not defined for the input).
+                - All: A convenience to retrieve all summary types
+                - AllForNonNumeric: A convenience to retrieve all summary types for non-numeric data
 
             filter_expression (str):  Filter expression.
             calculation_basis (CalculationBasis, optional): Basis by which to
                 calculate the summary statistic.
-                Defaults to CalculationBasis.EVENT_WEIGHTED.
+                Defaults to CalculationBasis.EventWeighted.
             time_type (TimestampCalculation, optional): How the timestamp is
-                calculated. Defaults to TimestampCalculation.AUTO.
+                calculated. Defaults to TimestampCalculation.Auto.
             AFfilter_evaluation (ExpressionSampleType, optional): Expression
                 Type. Defaults to
-                ExpressionSampleType.EXPRESSION_RECORDED_VALUES.
+                ExpressionSampleType.ExpressionRecordedValues.
             filter_interval (str, optional): _description_. Defaults to None.
 
         Returns:
@@ -1265,7 +1239,7 @@ class TagList(UserList):
         """
         PIPointlist = generate_pipointlist(self)
         AFTimeRange = to_af_time_range(starttime, endtime)
-        if interval == 'event':
+        if interval == "event":
             AFInterval = AF.Time.AFTimeSpan(AFTimeRange.Span)
         else:
             AFInterval = AF.Time.AFTimeSpan.Parse(interval)
@@ -1301,8 +1275,9 @@ class TagList(UserList):
                         for value in x[key]
                     ]
                 )
-                df["Summary"] = df["Summary"].apply(
-                    lambda x: SummaryType(x).name
+                df["Summary"] = df["Summary"].replace(
+                    [y for y in x.Keys], 
+                    [y.ToString().replace('[','').split(',')[0] for y in x]
                 )
                 df = df.explode("Timestamp")
                 df[["Timestamp", "Value"]] = df["Timestamp"].apply(
@@ -1316,6 +1291,7 @@ class TagList(UserList):
 
 
 # aux functions
+
 
 # TODO: This should be converted to a staticmethod for the TagList class.
 # TODO: Define the output type of this.
