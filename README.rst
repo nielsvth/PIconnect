@@ -873,7 +873,7 @@ Threading is currently available for:
    "**.ehy.summary_extract**
    (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, col=False)", "*Method*", "Return dataframe of summary measures for discrete events of EventHierarchy, for the tag(s) specified"
    "**.ehy.calc_summary_extract** 
-   (interval, summary_types, expression, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, AFfilter_evaluation=ExpressionSampleType.ExpressionRecordedValues, filter_interval=None)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the interval for each event in the Hierarchy. Expression argument need to be entered as raw strings: r'expression'."
+   (interval, summary_types, expression, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, AFfilter_evaluation=ExpressionSampleType.ExpressionRecordedValues, filter_interval=None, col=False)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the interval for each event in the Hierarchy. Expression argument need to be entered as raw strings: r'expression'."
    
    
 .. csv-table:: CondensedEventHierarchy
@@ -891,7 +891,7 @@ Threading is currently available for:
    "**.ecd.summary_extract**
    (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, col=False)", "*Method*", "Return dataframe of summary values for events on bottom level of condensed hierarchy"
     "**.ecd.calc_summary_extract** 
-   (interval, summary_types, expression, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, AFfilter_evaluation=ExpressionSampleType.ExpressionRecordedValues, filter_interval)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the interval for each event at bottom level of the CondensedHierarchy. Expression argument need to be entered as raw strings: r'expression'."
+   (interval, summary_types, expression, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, AFfilter_evaluation=ExpressionSampleType.ExpressionRecordedValues, filter_interval, col=False)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the interval for each event at bottom level of the CondensedHierarchy. Expression argument need to be entered as raw strings: r'expression'."
 
 
 .. csv-table:: Asset
