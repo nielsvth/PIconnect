@@ -759,8 +759,8 @@ Threading is currently available for:
    (starttime, endtime, summary_types, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto)", "*Method*", "Return specified summary measure(s) for Tag within the specified timeframe 
         
         Summary_types are defined as SummaryType objects separated by '|'
-        fe: to extract min and max >> event.summary(['tag_x'], dataserver, SummaryType.Minimum|SummaryType.Maximum)"
-        Do not forget to import the SummaryType object from PIconnect.PIConsts
+        fe: to extract min and max >> event.summary(['tag_x'], dataserver, SummaryType.Minimum|SummaryType.Maximum)
+        Do not forget to import the SummaryType object from PIconnect.PIConsts"
    "**.summaries**
    (starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto)", "*Method*", "Return one or more summary values for each interval, within a specified timeframe"
    "**filtered_summaries**
@@ -785,8 +785,8 @@ Threading is currently available for:
    (starttime, endtime, summary_types, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto)", "*Method*", "Return specified summary measure(s) for Tags in Taglist
         
         Summary_types are defined as SummaryType objects separated by '|'
-        fe: to extract min and max >> event.summary(['tag_x'], dataserver, SummaryType.Minimum|SummaryType.Maximum)"
-        Do not forget to import the SummaryType object from PIconnect.PIConsts
+        fe: to extract min and max >> event.summary(['tag_x'], dataserver, SummaryType.Minimum|SummaryType.Maximum)
+        Do not forget to import the SummaryType object from PIconnect.PIConsts"
    "**.summaries**
    (starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto)", "*Method*", "Return one or more summary values for Tags in Taglist, for each interval within a time range"
    "**filtered_summaries**
@@ -842,8 +842,8 @@ Threading is currently available for:
    (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto)", "*Method*", "Return specified summary measure(s) for event
         
         Summary_types are defined as SummaryType objects separated by '|'
-        fe: to extract min and max >> event.summary(['tag_x'], dataserver, SummaryType.Minimum|SummaryType.Maximum)"
-        Do not forget to import the SummaryType object from PIconnect.PIConsts
+        fe: to extract min and max >> event.summary(['tag_x'], dataserver, SummaryType.Minimum|SummaryType.Maximum)
+        Do not forget to import the SummaryType object from PIconnect.PIConsts"
    "**.summaries**
    (tag_list, interval, summary_types, dataserver=None, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto)", "*Method*", "Return one or more summary values for Tags in Taglist, for each interval"
    "**.filtered_summaries**
