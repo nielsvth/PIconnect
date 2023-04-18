@@ -639,7 +639,8 @@ Core functionality for doing advanced calculations and filtering
     # expression argument needs to be passed as raw string (r"")
     
     # calculation on recorded values
-    # for overview of expression syntax: https://docs.aveva.com/bundle/pi-server-af-analytics/page/1021946.html
+    # for overview of expression syntax: 
+    # https://docs.aveva.com/bundle/pi-server-af-analytics/page/1021946.html
     calc1 = PIconnect.calc.calc_recorded(
         "1-10-2022 14:00",
         "1-10-2022 22:00",
@@ -702,7 +703,11 @@ Threading is currently available for:
         col=False,
     )
 
-    #initialize the threading function by providing source, appropriate class method, args dict and chunk_size
+    #initialize the threading function by providing 
+    # source (Taglist, EventHierarchy or Condensed object), 
+    # appropriate class method, 
+    # args dict 
+    # and chunk_size
     res = PIconnect.thread.threading(
         source = condensed,
         method = PIconnect.PIAF.CondensedEventHierarchy.summary_extract,
