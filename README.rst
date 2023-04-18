@@ -7,7 +7,7 @@ A Python connector to the OSISoft PI AF SDK
 
 'nielsvth/PIconnect' provides a programmatic interface in Python to the OSISoft PI AF SDK. 
 This branch expands upon the 'Hugovdberg/PIconnect' package to include additional functionality for working with Assets, Attributes and (hierarchical) EventFrames.
-It also provides functionality for executing bulk queries and calculations. 
+It also provides functionality for executing bulk queries, threading and calculations. 
 
 The basic introduction to working with the PIconnect package is covered in the Tutorial below.
 
@@ -221,34 +221,33 @@ An event frame encapsulates the time period of the event and links it to assets 
     # Return specified summary measure(s) for tags specified by list of tagnames
     # (SINUSOID) or Tags within the event.
 
-    """summary_types (int): integers separated by '|'. List given
-        below. E.g. "summary_types = 1|8" gives TOTAL and MAXIMUM
+    # summary_types (SummaryType object): SummaryType objects separated by '|'. List given
+    # below. E.g. "summary_types = SummaryType.Minimum | SummaryType.Maximum"
+    # Do not forget to import the SummaryType object from PIconnect.PIConsts
 
-        - TOTAL = 1: A total over the time span
-        - AVERAGE = 2: Average value over the time span
-        - MINIMUM = 4: The minimum value in the time span
-        - MAXIMUM = 8: The maximum value in the time span
-        - RANGE = 16: The range of the values (max-min) in the time
-            span
-        - STD_DEV = 32 : The sample standard deviation of the values
-            over the time span
-        - POP_STD_DEV = 64: The population standard deviation of the
-            values over the time span
-        - COUNT = 128: The sum of the event count (when the
-            calculation is event weighted). The sum of the event time
-                duration (when the calculation is time weighted.)
-        - PERCENT_GOOD = 8192: The percentage of the data with a good
-            value over the time range. Based on time for time weighted
-                calculations, based on event count for event weigthed
-                calculations.
-        - TOTAL_WITH_UOM = 16384: The total over the time span, with
-            the unit of measurement that's associated with the input
-            (or no units if not defined for the input)
-        - ALL = 24831: A convenience to retrieve all summary types
-        - ALL_FOR_NON_NUMERIC = 8320: A convenience to retrieve all
-            summary types for non-numeric data"""
+    #     - Total: A total over the time span
+    #     - Average: Average value over the time span
+    #     - Minimum: The minimum value in the time span
+    #     - Maximum: The maximum value in the time span
+    #     - Range: The range of the values (max-min) in the time span
+    #     - StdDev: The sample standard deviation of the values over the time span
+    #     - PopulationStdDev: The population standard deviation of the values over the time span
+    #     - Count: The sum of the event count (when the calculation is event weighted).
+    #             The sum of the event time duration (when the calculation is time
+    #             weighted.)
+    #     - PercentGood: The percentage of the data with a good value over the time range.
+    #             Based on time for time weighted calculations, based on event count for
+    #             event weigthed calculations.
+    #     - TotalWithUOM: The total over the time span, with the unit of measurement that's
+    #             associated with the input (or no units if not defined for the input).
+    #     - All: A convenience to retrieve all summary types
+    #     - AllForNonNumeric: A convenience to retrieve all summary types for non-numeric data
+    
+    # import SummaryType object
+    from PIconnect.PIConsts import SummaryType
+    
     summary_values = event.summary(
-        tag_list=["SINUSOID"], summary_types=4 | 8, dataserver=server
+        tag_list=["SINUSOID"], summary_types= SummaryType.Minimum | SummaryType.Maximum, dataserver=server
     )
 
     # Make summary dataframe visible in variable explorer
@@ -323,11 +322,14 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
     interpolated_values = eventhierarchy.ehy.interpol_discrete_extract(
         tag_list=["tags"], interval="1h", dataserver=server, col=True
     )
-
+    
+    # import SummaryType object
+    from PIconnect.PIConsts import SummaryType
+    
     # Return dataframe of summary data for discrete events of EventHierarchy
     summary_values = eventhierarchy.ehy.summary_extract(
         tag_list=["SINUSOID", "SINUSOIDU"],
-        summary_types=4 | 8 | 32,
+        summary_types= SummaryType.Minimum | SummaryType.Maximum | SummaryType.StdDev,
         dataserver=server,
         col=False,
     )
@@ -337,7 +339,7 @@ The AssetHierarchy objects provides a dataframe-like representation of the hiera
     # only one value is calculated for each summary over this event
     calc_summary_values = eventhierarchy.ehy.calc_summary_extract(
         interval="100h",
-        summary_types=4 | 8,
+        summary_types= SummaryType.Minimum | SummaryType.Maximum,
         expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
         col = False
     )
@@ -405,12 +407,15 @@ The CondensedEventHierarchy object provides a dataframe-like representation of t
     recorded_values = df_cond.ecd.recorded_extract(
         tag_list=["SINUSOID", "SINUSOIDU"], dataserver=server
     )
-
+    
+    # import SummaryType object
+    from PIconnect.PIConsts import SummaryType
+    
     # Return dataframe of summary data for events on bottom level of condensed
     # hierarchy
     summary_values = df_cond.ecd.summary_extract(
         tag_list=["SINUSOID", "SINUSOIDU"],
-        summary_types=2 | 4 | 8,
+        summary_types= SummaryType.Average | SummaryType.Minimum | SummaryType.Maximum,
         dataserver=server,
     )
     
@@ -419,7 +424,7 @@ The CondensedEventHierarchy object provides a dataframe-like representation of t
     # only one value is calculated for each summary over this event
     calc_summary_values = condensed.ecd.calc_summary_extract(
         interval="100h",
-        summary_types=4 | 8,
+        summary_types= SummaryType.Minimum | SummaryType.Maximum,
         expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
         col = False
     )
@@ -494,16 +499,19 @@ For example, a Tag might store the flow rate from a meter, a controller's mode o
     plot_values = tag.plot_values(
         starttime="*-20d", endtime="*-10d", nr_of_intervals=10
     )
-
+    
+    # import SummaryType object
+    from PIconnect.PIConsts import SummaryType
+    
     # Return specified summary measure(s) for Tag within defined timeframe
     summary_values = tag.summary(
-        starttime="*-20d", endtime="*-10d", summary_types=2 | 4 | 8
+        starttime="*-20d", endtime="*-10d", summary_types= SummaryType.Average | SummaryType.Minimum | SummaryType.Maximum
     )
 
     # Return one or more summary values for each interval for a Tag, within a
     # specified timeframe
     summaries_values = tag.summaries(
-        starttime="*-20d", endtime="*-10d", interval="1d", summary_types=2 | 4 | 8
+        starttime="*-20d", endtime="*-10d", interval="1d", summary_types= SummaryType.Average | SummaryType.Minimum | SummaryType.Maximum
     )
 
     # Return one or more summary values for each interval for a Tag, within a
@@ -512,8 +520,8 @@ For example, a Tag might store the flow rate from a meter, a controller's mode o
         starttime="*-20d",
         endtime="*-10d",
         interval="1d",
-        summary_types=2 | 4 | 8,
-        filter_expression="'SINUSOID' > 30",
+        summary_types= SummaryType.Average | SummaryType.Minimum | SummaryType.Maximum,
+        filter_expression="'\\ITSBEBEPIHISCOL\SINUSOID' > 30",
     )
 
 
@@ -557,16 +565,19 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
     plot_values = taglist.plot_values(
         starttime="*-20d", endtime="*-10d", nr_of_intervals=10
     )
+    
+    # import SummaryType object
+    from PIconnect.PIConsts import SummaryType
 
     # Return specified summary measure(s) for tags in TagList, within defined timeframe
     summary_values = taglist.summary(
-        starttime="*-20d", endtime="*-10d", summary_types=2 | 4 | 8
+        starttime="*-20d", endtime="*-10d", summary_types= SummaryType.Average | SummaryType.Minimum | SummaryType.Maximum
     )
 
     # Return one or more summary values for each interval for tags in TagList, within a
     # specified timeframe
     summaries_values = taglist.summaries(
-        starttime="*-20d", endtime="*-10d", interval="1d", summary_types=2 | 4 | 8
+        starttime="*-20d", endtime="*-10d", interval="1d", summary_types= SummaryType.Average | SummaryType.Minimum | SummaryType.Maximum
     )
 
     # Return one or more summary values for each interval for tags in TagList, within a
@@ -575,7 +586,7 @@ It is recommened to use the Taglist methods when collecting data for multiple Ta
         starttime="*-20d",
         endtime="*-10d",
         interval="1d",
-        summary_types=2 | 4 | 8,
+        summary_types= SummaryType.Average | SummaryType.Minimum | SummaryType.Maximum,
         filter_expression="'SINUSOID' > 30",
     )
 
@@ -643,6 +654,9 @@ Core functionality for doing advanced calculations and filtering
         r"TagTot('\\ITSBEBEPIHISCOL\SINUSOID', '01-Oct-2022 14:00:00', '03-Oct-2022 14:00:00')",
     )
     
+    # import SummaryType object
+    from PIconnect.PIConsts import SummaryType
+    
     # calculation of summary measures of interval for calculated values
     # interval is set to 100h. As long as interval is bigger than the event duration, 
     # only one value is calculated for each summary over this event. 
@@ -650,7 +664,7 @@ Core functionality for doing advanced calculations and filtering
         starttime = "1-10-2022 14:00",
         endtime = "1-10-2022 22:00",
         interval='100h',
-        summary_types= 4|8,
+        summary_types= SummaryType.Minimum | SummaryType.Maximum,
         expression=r"('\\ITSBEBEPIHISCOL\SINUSOID')-('\\ITSBEBEPIHISCOL\SINUSOIDU')",
     )
 
@@ -676,11 +690,14 @@ Threading is currently available for:
    
     #get a condensed hierarchy
     condensed = eventhierarchy.ehy.condense()
-
+    
+    # import SummaryType object
+    from PIconnect.PIConsts import SummaryType
+    
     #pass arguments as a dict
     x = dict(
         tag_list=["SINUSOID, SINUSOIDU"],
-        summary_types=2 | 4,
+        summary_types= SummaryType.Minimum | SummaryType.Maximum,
         dataserver=server,
         col=False,
     )
@@ -730,18 +747,19 @@ Threading is currently available for:
    "**.interpolated_values**
    (starttime, endtime, interval, filter_expression='')", "*Method*", "Return Dataframe of interpolated values at specified interval for Tag, between starttime and endtime"
    "**.recorded_values**
-   (starttime, endtime, filter_expression='', AFBoundaryType=BoundaryType.INTERPOLATED)", "*Method*", "Return Dataframe of recorded values for Tag, between starttime and endtime"
+   (starttime, endtime, filter_expression='', AFBoundaryType=BoundaryType.Interpolated)", "*Method*", "Return Dataframe of recorded values for Tag, between starttime and endtime"
    "**.plot_values**
    (starttime, endtime, nr_of_intervals)", "*Method*", "Retrieves values over the specified time range suitable for plotting over the number of intervals (typically represents pixels). Returns a Dataframe with values that will produce the most accurate plot over the time range while minimizing the amount of data returned.Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and at most one exceptional point (bad status or digital state)"
    "**.summary**
-   (starttime, endtime, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return specified summary measure(s) for Tag within the specified timeframe 
+   (starttime, endtime, summary_types, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto)", "*Method*", "Return specified summary measure(s) for Tag within the specified timeframe 
         
-        Summary_types are defined as integers separated by '|'
-        fe: to extract min(=4) and max(=8) >> event.summary(['tag_x'], dataserver, 4|8)"
+        Summary_types are defined as SummaryType objects separated by '|'
+        fe: to extract min and max >> event.summary(['tag_x'], dataserver, SummaryType.Minimum|SummaryType.Maximum)"
+        Do not forget to import the SummaryType object from PIconnect.PIConsts
    "**.summaries**
-   (starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return one or more summary values for each interval, within a specified timeframe"
+   (starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto)", "*Method*", "Return one or more summary values for each interval, within a specified timeframe"
    "**filtered_summaries**
-   (starttime, endtime, interval,summary_types, filter_expression, calculation_basis=CalculationBasis.EVENT_WEIGHTED, time_type=TimestampCalculation.AUTO, AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, filter_interval=None)", "*Method*", "Return one or more summary values for each interval, within a specified timeframe, for values that meet the specified filter condition"
+   (starttime, endtime, interval,summary_types, filter_expression, calculation_basis=CalculationBasis.EventWeighted, time_type=TimestampCalculation.Auto, AFfilter_evaluation=ExpressionSampleType.ExpressionRecordedValues, filter_interval=None)", "*Method*", "Return one or more summary values for each interval, within a specified timeframe, for values that meet the specified filter condition"
 
 
 .. csv-table:: TagList
@@ -757,16 +775,17 @@ Threading is currently available for:
    "**.interpolated_values**
    (starttime, endtime, interval, filter_expression='')", "*Method*", "Return Dataframe of interpolated values for Tags in TagList, between starttime and endtime"
    "**.recorded_values**
-   (starttime, endtime, filter_expression='', AFBoundaryType=BoundaryType.INTERPOLATED)", "*Method*", "Return dictionary of Dataframes of recorded values for Tags in TagList, between starttime and endtime"
+   (starttime, endtime, filter_expression='', AFBoundaryType=BoundaryType.Interpolated)", "*Method*", "Return dictionary of Dataframes of recorded values for Tags in TagList, between starttime and endtime"
    "**.summary**
-   (starttime, endtime, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return specified summary measure(s) for Tags in Taglist
+   (starttime, endtime, summary_types, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto)", "*Method*", "Return specified summary measure(s) for Tags in Taglist
         
-        Summary_types are defined as integers separated by '|'
-        fe: to extract min and max >> event.summary(['tag_x'], dataserver, 4|8)"
+        Summary_types are defined as SummaryType objects separated by '|'
+        fe: to extract min and max >> event.summary(['tag_x'], dataserver, SummaryType.Minimum|SummaryType.Maximum)"
+        Do not forget to import the SummaryType object from PIconnect.PIConsts
    "**.summaries**
-   (starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return one or more summary values for Tags in Taglist, for each interval within a time range"
+   (starttime, endtime, interval, summary_types, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto)", "*Method*", "Return one or more summary values for Tags in Taglist, for each interval within a time range"
    "**filtered_summaries**
-   (self, starttime, endtime, interval,summary_types, filter_expression, calculation_basis=CalculationBasis.EVENT_WEIGHTED, time_type=TimestampCalculation.AUTO, AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, filter_interval=None)", "*Method*", "Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet the filter criteria"
+   (self, starttime, endtime, interval,summary_types, filter_expression, calculation_basis=CalculationBasis.EventWeighted, time_type=TimestampCalculation.Auto, AFfilter_evaluation=ExpressionSampleType.ExpressionRecordedValues, filter_interval=None)", "*Method*", "Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet the filter criteria"
 
 
 .. csv-table:: PIAFDatabase
@@ -781,9 +800,9 @@ Threading is currently available for:
    "**.descendant**
    (path)", "*Method*", "Return a descendant of the database from an exact path"
    "**.find_events**
-   (query=None, asset='*', start_time=None, end_time='*', template_name = None, start_index=0, max_count=1000000, search_mode=SearchMode.INCLUSIVE, search_full_hierarchy=True, sortField=SortField.STARTTIME, sortOrder=SortOrder.ASCENDING)", "*Method*", "Return an EventList that meets query criteria"
+   (query=None, asset='*', start_time=None, end_time='*', template_name = None, start_index=0, max_count=1000000, search_mode=SearchMode.Inclusive, search_full_hierarchy=True, sortField=SortField.StartTime, sortOrder=SortOrder.Ascending)", "*Method*", "Return an EventList that meets query criteria"
    "**.find_assets**
-   (query=None, top_asset=None, searchField=SearchField.NAME, search_full_hierarchy=True, sortField=SortField.STARTTIME, sortOrder=SortOrder.ASCENDING, max_count=10000000)", "*Method*", "Return an AssetList that meets query criteria"
+   (query=None, top_asset=None, searchField=SearchField.Name, search_full_hierarchy=True, sortField=SortField.StartTime, sortOrder=SortOrder.Ascending, max_count=10000000)", "*Method*", "Return an AssetList that meets query criteria"
    
    
 .. csv-table:: Event
@@ -813,16 +832,17 @@ Threading is currently available for:
    "**.interpolated_values**
    (tag_list, interval, dataserver=None, filter_expression='')", "*Method*", "Return Dataframe of interpolated values for tags specified by list of tagnames or Tags, for a defined interval within the event"
    "**.recorded_values**
-   (tag_list, dataserver=None, filter_expression='', AFBoundaryType=BoundaryType.INSIDE)", "*Method*", "Return Dataframe of recorded values for tags specified by list of tagnames or Tags, within the event"
+   (tag_list, dataserver=None, filter_expression='', AFBoundaryType=BoundaryType.Inside)", "*Method*", "Return Dataframe of recorded values for tags specified by list of tagnames or Tags, within the event"
    "**.summary**
-   (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return specified summary measure(s) for event
+   (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto)", "*Method*", "Return specified summary measure(s) for event
         
-        Summary_types are defined as integers separated by '|'
-        fe: to extract min and max >> event.summary(['tag_x'], dataserver, 4|8)"
+        Summary_types are defined as SummaryType objects separated by '|'
+        fe: to extract min and max >> event.summary(['tag_x'], dataserver, SummaryType.Minimum|SummaryType.Maximum)"
+        Do not forget to import the SummaryType object from PIconnect.PIConsts
    "**.summaries**
-   (tag_list, interval, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO)", "*Method*", "Return one or more summary values for Tags in Taglist, for each interval"
+   (tag_list, interval, summary_types, dataserver=None, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto)", "*Method*", "Return one or more summary values for Tags in Taglist, for each interval"
    "**.filtered_summaries**
-   (tag_list, interval,summary_types, filter_expression, dataserver=None, calculation_basis=CalculationBasis.EVENT_WEIGHTED, time_type=TimestampCalculation.AUTO, AFfilter_evaluation=ExpressionSampleType.EXPRESSION_RECORDED_VALUES, filter_interval=None)", "*Method*", "Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet filter the criteria"
+   (tag_list, interval,summary_types, filter_expression, dataserver=None, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, AFfilter_evaluation=ExpressionSampleType.ExpressionRecordedValues, filter_interval=None)", "*Method*", "Return one or more summary values for Tags in Taglist, (Optional: for each interval) that meet filter the criteria"
    "**.get_attribute_values**
    (attribute_names_list=[])", "*Method*", "Return dict of attribute values for specified attributes"
    "**.get_event_hierarchy**
@@ -851,9 +871,9 @@ Threading is currently available for:
    "**.ehy.interpol_discrete_extract**
    (tag_list, interval, filter_expression='', dataserver=None, col=False)", "*Method*", "Return dataframe of interpolated data for discrete events of EventHierarchy, for the tag(s) specified"
    "**.ehy.summary_extract**
-   (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, col=False)", "*Method*", "Return dataframe of summary measures for discrete events of EventHierarchy, for the tag(s) specified"
+   (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, col=False)", "*Method*", "Return dataframe of summary measures for discrete events of EventHierarchy, for the tag(s) specified"
    "**.ehy.calc_summary_extract** 
-   (interval, summary_types, expression, calculation_basis, time_type, AFfilter_evaluation, filter_interval)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the interval for each event in the Hierarchy. Expression argument need to be entered as raw strings: r'expression'."
+   (interval, summary_types, expression, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, AFfilter_evaluation=ExpressionSampleType.ExpressionRecordedValues, filter_interval=None)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the interval for each event in the Hierarchy. Expression argument need to be entered as raw strings: r'expression'."
    
    
 .. csv-table:: CondensedEventHierarchy
@@ -865,13 +885,13 @@ Threading is currently available for:
    "**.ecd.interpol_continuous_extract**
    (tag_list, interval, filter_expression='', dataserver=None)", "*Method*", "Return dataframe of continous, interpolated values from the start of the first filtered event to the end of the last filtered event, for each procedure, on bottom level of condensed hierarchy"
    "**.ecd.recorded_extract**
-   (tag_list, filter_expression='', AFBoundaryType=BoundaryType.INTERPOLATED, dataserver=None)", "*Method*", "Return nested dictionary (level 1: Procedures, Level 2: Tags) of recorded data extracts from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy"
+   (tag_list, filter_expression='', AFBoundaryType=BoundaryType.Interpolated, dataserver=None)", "*Method*", "Return nested dictionary (level 1: Procedures, Level 2: Tags) of recorded data extracts from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy"
    "**.ecd.plot_continuous_extract**
    (tag_list, nr_of_intervals, dataserver=None)", "*Method*", "Return nested dictionary (level 1: Procedures, Level 2: Tags) of continuous plot values from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy. Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and at most one exceptional point (bad status or digital state)"
    "**.ecd.summary_extract**
-   (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TIME_WEIGHTED, time_type=TimestampCalculation.AUTO, col=False)", "*Method*", "Return dataframe of summary values for events on bottom level of condensed hierarchy"
+   (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, col=False)", "*Method*", "Return dataframe of summary values for events on bottom level of condensed hierarchy"
     "**.ecd.calc_summary_extract** 
-   (interval, summary_types, expression, calculation_basis, time_type, AFfilter_evaluation, filter_interval)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the interval for each event at bottom level of the CondensedHierarchy. Expression argument need to be entered as raw strings: r'expression'."
+   (interval, summary_types, expression, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, AFfilter_evaluation=ExpressionSampleType.ExpressionRecordedValues, filter_interval)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the interval for each event at bottom level of the CondensedHierarchy. Expression argument need to be entered as raw strings: r'expression'."
 
 
 .. csv-table:: Asset
@@ -946,7 +966,7 @@ Threading is currently available for:
     "**PIconnect.calc.calc_interpolated**
    (starttime, endtime, interval, expression=r"")", "*Method*", "Returns dataframe that contains the result of evaluating the passed expression over the passed time range at a defined interval. Expression argument need to be entered as raw strings: r'expression'."
    "**calc.calc_summary**
-   (starttime, endtime, interval, summary_types, expression, calculation_basis, time_type, AFfilter_evaluation, filter_interval)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the specified duration and interval. Expression argument need to be entered as raw strings: r'expression'."
+   (starttime, endtime, interval, summary_types, expression, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, AFfilter_evaluation=ExpressionSampleType.ExpressionRecordedValues, filter_interval)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the specified duration and interval. Expression argument need to be entered as raw strings: r'expression'."
 
 
 15.    PIConstants
@@ -972,26 +992,27 @@ They are imported from the PIConsts module and used as illustrated in the exampl
     recorded_values = event.recorded_values(
         tag_list=["SINUSOID"],
         dataserver=server,
-        AFBoundaryType=BoundaryType.INSIDE,
+        AFBoundaryType=BoundaryType.Inside,
     )
 
-    # Now let's change the AFBoundaryType argument to INTERPOLATED
+    # Now let's change the AFBoundaryType argument to Interpolated
     # Class BoundaryType has following options:
-    # Return the recorded values on the inside of the requested time range as
-    # the first and last values.
-    # INSIDE = 0
-    # Return the recorded values on the outside of the requested time range as
-    # the first and last values.
-    # OUTSIDE = 1
-    # Create an interpolated value at the end points of the requested time
-    # range if a recorded value does not exist at that time.
-    # INTERPOLATED = 2
+    # Specifies to return the recorded values on the inside 
+    #of the requested time range as the first and last values.
+    - Inside
+    # Specifies to return the recorded values on the outside 
+    #of the requested time range as the first and last values.
+    - Outside
+    # Specifies to create an interpolated value 
+    # at the end points of the requested time range
+    # if a recorded value does not exist at that time.
+    - Interpolated
 
-    # lets set BoundaryType to BoundaryType.INTERPOLATED
+    # lets set BoundaryType to BoundaryType.Interpolated
     recorded_values = event.recorded_values(
         tag_list=["SINUSOID"],
         dataserver=server,
-        AFBoundaryType=BoundaryType.INTERPOLATED,
+        AFBoundaryType=BoundaryType.Interpolated,
     )
 
 
