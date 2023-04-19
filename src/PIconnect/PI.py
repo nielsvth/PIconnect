@@ -33,7 +33,6 @@ from PIconnect.AFSDK import System
 from collections import UserList
 
 import pandas as pd
-import numpy as np
 
 pd.options.mode.chained_assignment = None  # default='warn'
 _NOTHING = object()

@@ -34,7 +34,7 @@ if (
 ):
     _af, _System, _AF_SDK_version = __fallback()
 else:
-    import clr
+    import clr as _clr
 
     # Get the installation directory from the environment variable or fall back
     # to the Windows default installation path
@@ -57,7 +57,7 @@ else:
 
     sys.path.append(PIAF_SDK)
 
-    clr.AddReference("OSIsoft.AFSDK")  # type: ignore ; pylint: disable=no-member
+    _clr.AddReference("OSIsoft.AFSDK")  # type: ignore ; pylint: disable=no-member
 
     import System as _System  # type: ignore
     from OSIsoft import AF as _af  # type: ignore
@@ -74,3 +74,4 @@ if typing.TYPE_CHECKING:
 AF = _af
 System = _System
 AF_SDK_VERSION = _AF_SDK_version
+clr = _clr

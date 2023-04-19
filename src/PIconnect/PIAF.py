@@ -11,7 +11,6 @@ from __future__ import (
 
 from typing import Any, Dict, Optional, Union, cast, List
 
-import clr
 import pandas as pd
 import numpy as np
 #import System
