@@ -9,45 +9,20 @@ from __future__ import (
     unicode_literals,
 )
 
-from builtins import (
-    ascii,
-    bytes,
-    chr,
-    dict,
-    filter,
-    hex,
-    input,
-    int,
-    list,
-    map,
-    next,
-    object,
-    oct,
-    open,
-    pow,
-    range,
-    round,
-    str,
-    super,
-    zip,
-)
-from typing import Dict, List, Union
+from typing import Any, Dict, Optional, Union, cast, List
 
 import clr
 import pandas as pd
 import numpy as np
-import System
+#import System
+
+from PIconnect.AFSDK import System
 
 from collections import UserList
 
-try:
-    from __builtin__ import str as BuiltinStr
-except ImportError:
-    BuiltinStr = str
 # pragma pylint: enable=unused-import, redefined-builtin
 from warnings import warn
 
-from PIconnect._utils import classproperty
 from PIconnect.AFSDK import AF
 from PIconnect.calc import calc_summary
 from PIconnect.time import to_af_time
@@ -71,13 +46,11 @@ from PIconnect.PI import (
     generate_pipointlist,
     convert_to_TagList,
 )
-
+from PIconnect._utils import InitialisationWarning
+import dataclasses
 from pytz import timezone, utc
 from datetime import datetime, timedelta
 
-clr.AddReference("System.Collections")
-from System.Collections.Generic import List as C_List  # noqa: E402
-from System import Exception as dotNetException  # type: ignore # noqa: E402
 
 _NOTHING = object()
 
@@ -570,7 +543,7 @@ class AssetList(UserList):
             try:
                 afcontainer.Add(asset.af_asset)
             except:
-                raise ("Failed to process event {}".format(event))
+                raise ("Failed to process event {}".format(asset))
 
         df_assets = pd.DataFrame(
             columns=["Asset", "Path", "Name", "Template", "Level"]
@@ -746,107 +719,117 @@ class AssetHierarchy:
         return df_condensed
 
 
+@dataclasses.dataclass(frozen=True)
+class PIAFServer:
+    server: AF.PISystem
+    databases: Dict[str, AF.AFDatabase] = dataclasses.field(default_factory=dict)
+
+    def __getitem__(self, attr: str) -> Union[AF.PISystem, Dict[str, AF.AFDatabase]]:
+        return getattr(self, attr)
+
+
+ServerSpec = Dict[str, Union[AF.PISystem, Dict[str, AF.AFDatabase]]]
+
+
+def _lookup_servers() -> Dict[str, ServerSpec]:
+    servers: Dict[str, PIAFServer] = {}
+    for s in AF.PISystems():
+        try:
+            servers[s.Name] = server = PIAFServer(s)
+            for d in s.Databases:
+                try:
+                    server.databases[d.Name] = d
+                except (Exception, System.Exception) as e:  # type: ignore
+                    warn(
+                        f"Failed loading database data for {d.Name} on {s.Name} "
+                        f"with error {type(cast(Exception, e)).__qualname__}",
+                        InitialisationWarning,
+                    )
+        except (Exception, System.Exception) as e:  # type: ignore
+            warn(
+                f"Failed loading server data for {s.Name} "
+                f"with error {type(cast(Exception, e)).__qualname__}",
+                InitialisationWarning,
+            )
+    return {
+        server_name: {
+            "server": server.server,
+            "databases": {db_name: db for db_name, db in server.databases.items()},
+        }
+        for server_name, server in servers.items()
+    }
+
+
+def _lookup_default_server() -> Optional[ServerSpec]:
+    servers = _lookup_servers()
+    if AF.PISystems().DefaultPISystem:
+        return servers[AF.PISystems().DefaultPISystem.Name]
+    elif len(servers) > 0:
+        return servers[list(_lookup_servers())[0]]
+    else:
+        return None
+
+
 class PIAFDatabase(object):
     """PIAFDatabase
-
     Context manager for connections to the PI Asset Framework database.
     """
 
     version = "0.2.0"
 
-    _servers = _NOTHING
-    _default_server = _NOTHING
+    servers: Dict[str, ServerSpec] = _lookup_servers()
+    default_server: Optional[ServerSpec] = _lookup_default_server()
 
-    def __init__(self, server=None, database=None):
-        self.server = None
-        self.database = None
-        self._initialise_server(server)
-        self._initialise_database(database)
+    def __init__(
+        self, server: Optional[str] = None, database: Optional[str] = None
+    ) -> None:
+        server_spec = self._initialise_server(server)
+        self.server: AF.PISystem = server_spec["server"]  # type: ignore
+        self.database: AF.AFDatabase = self._initialise_database(server_spec, database)
 
-    @classproperty
-    def servers(self):
-        if self._servers is _NOTHING:
-            i, j, failed_servers, failed_databases = 0, 0, 0, 0
-            self._servers = {}
+    def _initialise_server(self, server: Optional[str]) -> ServerSpec:
+        if server is None:
+            if self.default_server is None:
+                raise ValueError("No server specified and no default server found.")
+            return self.default_server
 
-            for i, s in enumerate(AF.PISystems(), start=1):
-                try:
-                    self._servers[s.Name] = {"server": s, "databases": {}}
-                    for j, d in enumerate(s.Databases, start=1):
-                        try:
-                            self._servers[s.Name]["databases"][d.Name] = d
-                        except Exception:
-                            failed_databases += 1
-                        except dotNetException:
-                            failed_databases += 1
-                except Exception:
-                    failed_servers += 1
-                except dotNetException:
-                    failed_servers += 1
-            if failed_servers or failed_databases:
-                warn(
-                    "Failed loading {}/{} servers and {}/{} databases".format(
-                        failed_servers, i, failed_databases, j
-                    )
+        if server not in self.servers:
+            if self.default_server is None:
+                raise ValueError(
+                    f'Server "{server}" not found and no default server found.'
                 )
-        return self._servers
-
-    @classproperty
-    def default_server(self):
-        if self._default_server is _NOTHING:
-            self._default_server = None
-            if AF.PISystems().DefaultPISystem:
-                self._default_server = self.servers[
-                    AF.PISystems().DefaultPISystem.Name
-                ]
-            elif len(self.servers) > 0:
-                self._default_server = self.servers[list(self.servers)[0]]
-            else:
-                self._default_server = None
-        return self._default_server
-
-    def _initialise_server(self, server: AF.PISystem) -> None:
-        """Initialize a server
-
-        Args:
-            server (AF.PISystem): server to initialize
-        """
-        if server and server not in self.servers:
             message = 'Server "{server}" not found, using the default server.'
             warn(message=message.format(server=server), category=UserWarning)
-        server = self.servers.get(server, self.default_server)
-        self.server = server["server"]
+            return self.default_server
 
-    def _initialise_database(self, database: AF.AFDatabase) -> None:
-        """Initialize a provided database
+        return self.servers[server]
 
-        Args:
-            database (AF.AFDatabase): AF Database to initialize
-        """
-        server = self.servers.get(self.server.Name)
-        if not server["databases"]:
-            server["databases"] = {x.Name: x for x in self.server.Databases}
-        if database and database not in server["databases"]:
-            message = (
-                'Database "{database}" not found, using the default database.'
-            )
+    def _initialise_database(
+        self, server: ServerSpec, database: Optional[str]
+    ) -> AF.AFDatabase:
+        default_db = self.server.Databases.DefaultDatabase
+        if database is None:
+            return default_db
+
+        databases = cast(Dict[str, AF.AFDatabase], server["databases"])
+        if database not in databases:
+            message = 'Database "{database}" not found, using the default database.'
             warn(
                 message=message.format(database=database), category=UserWarning
             )
-        default_db = self.server.Databases.DefaultDatabase
-        self.database = server["databases"].get(database, default_db)
+            return default_db
 
-    def __enter__(self):
+        return databases[database]
+
+    def __enter__(self) -> "PIAFDatabase":
         self.server.Connect()
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: Any) -> None:
         pass
         # Disabled disconnecting because garbage collection sometimes impedes
         # connecting to another server later
         # self.server.Disconnect()
-        self.server.Refresh()
-        self.database.Refresh()
 
     def __repr__(self):
         return "%s(\\\\%s\\%s)" % (

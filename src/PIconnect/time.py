@@ -5,6 +5,7 @@ import pytz
 
 from PIconnect.AFSDK import AF
 from PIconnect.config import PIConfig
+from PIconnect.AFSDK import System
 
 
 def to_af_time_range(
@@ -62,7 +63,7 @@ def to_af_time(time: Union[str, datetime]) -> AF.Time.AFTime:
     return AF.Time.AFTime(time)
 
 
-def timestamp_to_index(timestamp):
+def timestamp_to_index(timestamp: System.DateTime):
     """Convert System.DateTime to datetime in local timezone.
 
     Args:

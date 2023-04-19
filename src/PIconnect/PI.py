@@ -1,48 +1,15 @@
 """ PI
     Core containers for connections to PI databases
 """
-# pragma pylint: disable=unused-import, redefined-builtin
-from __future__ import (
-    absolute_import,
-    division,
-    print_function,
-    unicode_literals,
-)
-from ast import Expression
 
-from builtins import (
-    ascii,
-    bytes,
-    chr,
-    dict,
-    filter,
-    hex,
-    input,
-    int,
-    list,
-    map,
-    next,
-    object,
-    oct,
-    open,
-    pow,
-    range,
-    round,
-    str,
-    super,
-    zip,
-)
+from typing import Any, Dict, List, Optional, Union, cast
+
 from dataclasses import dataclass
 import datetime
 from typing import Dict, List, Union
 
-try:
-    from __builtin__ import str as BuiltinStr
-except ImportError:
-    BuiltinStr = str
 # pragma pylint: enable=unused-import, redefined-builtin
 from warnings import warn
-from PIconnect._utils import classproperty
 from PIconnect.AFSDK import AF
 from PIconnect.PIConsts import (
     AuthenticationMode,
@@ -60,6 +27,9 @@ from PIconnect.time import (
     to_af_time,
 )
 
+from PIconnect._utils import InitialisationWarning
+from PIconnect.AFSDK import System
+
 from collections import UserList
 
 import pandas as pd
@@ -68,112 +38,103 @@ import numpy as np
 pd.options.mode.chained_assignment = None  # default='warn'
 _NOTHING = object()
 
+def _lookup_servers() -> Dict[str, AF.PI.PIServer]:
+    servers: Dict[str, AF.PI.PIServer] = {}
+
+    for server in AF.PI.PIServers():
+        try:
+            servers[server.Name] = server
+        except (Exception, System.Exception) as e:  # type: ignore
+            warn(
+                f"Failed loading server data for {server.Name} "
+                f"with error {type(cast(Exception, e)).__qualname__}",
+                InitialisationWarning,
+            )
+    return servers
+
+
+def _lookup_default_server() -> Optional[AF.PI.PIServer]:
+    default_server = None
+    try:
+        default_server = AF.PI.PIServers().DefaultPIServer
+    except Exception:
+        warn("Could not load the default PI Server", ResourceWarning)
+    return default_server
 
 class PIServer(object):  # pylint: disable=useless-object-inheritance
     """PIServer is a connection to an OSIsoft PI Server
-
     Args:
-        server (str, optional): Name of the server to connect to.
-            defaults to None
+        server (str, optional): Name of the server to connect to, defaults to None
         username (str, optional): can be used only with password as well
         password (str, optional): -//-
         todo: domain, auth
         timeout (int, optional): the maximum seconds an operation can take
-
     .. note::
-        If the specified `server` is unknown a warning is thrown and the
-            connection is redirected to the default server, as if no server
-            was passed. The list of known servers is available in the
-            `PIServer.servers` dictionary.
+        If the specified `server` is unknown a warning is thrown and the connection
+        is redirected to the default server, as if no server was passed. The list
+        of known servers is available in the `PIServer.servers` dictionary.
     """
 
     version = "0.2.2"
 
     #: Dictionary of known servers, as reported by the SDK
-    _servers = _NOTHING
+    servers = _lookup_servers()
     #: Default server, as reported by the SDK
-    _default_server = _NOTHING
+    default_server = _lookup_default_server()
 
     def __init__(
         self,
-        server=None,
-        username=None,
-        password=None,
-        domain=None,
-        authentication_mode=AuthenticationMode.PIUserAuthentication,
-        timeout=None,
-    ):
-        if server and server not in self.servers:
+        server: Optional[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        domain: Optional[str] = None,
+        authentication_mode: AuthenticationMode = AuthenticationMode.PIUserAuthentication,
+        timeout: Optional[int] = None,
+    ) -> None:
+        if server is None:
+            if self.default_server is None:
+                raise ValueError(
+                    "No server was specified and no default server was found."
+                )
+            self.connection = self.default_server
+        elif server not in self.servers:
+            if self.default_server is None:
+                raise ValueError(
+                    f"Server '{server}' not found and no default server was found."
+                )
             message = 'Server "{server}" not found, using the default server.'
             warn(message=message.format(server=server), category=UserWarning)
+            self.connection = self.default_server
+        else:
+            self.connection = self.servers[server]
+
         if bool(username) != bool(password):
             raise ValueError(
-                "When passing credentials both the username and password "
-                + "must be specified."
+                "When passing credentials both the username and password must be specified."
             )
         if domain and not username:
             raise ValueError(
-                "A domain can only specified together with a username and "
-                + "password."
+                "A domain can only specified together with a username and password."
             )
         if username:
-            from System.Net import NetworkCredential
-            from System.Security import SecureString
-
-            secure_pass = SecureString()
-            for c in password:
-                secure_pass.AppendChar(c)
-            cred = [username, secure_pass] + ([domain] if domain else [])
+            secure_pass = System.Security.SecureString()
+            if password is not None:
+                for c in password:
+                    secure_pass.AppendChar(c)
+            cred = (username, secure_pass) + ((domain,) if domain else ())
             self._credentials = (
-                NetworkCredential(*cred),
+                System.Net.NetworkCredential(cred[0], cred[1], *cred[2:]),
                 authentication_mode,
             )
         else:
             self._credentials = None
 
-        self.connection = self.servers.get(server, self.default_server)
-
         if timeout:
-            from System import TimeSpan
-
             # System.TimeSpan(hours, minutes, seconds)
-            self.connection.ConnectionInfo.OperationTimeOut = TimeSpan(
+            self.connection.ConnectionInfo.OperationTimeOut = System.TimeSpan(
                 0, 0, timeout
             )
-
-    @classproperty
-    def servers(self):
-        if self._servers is _NOTHING:
-            i, failures = 0, 0
-            self._servers = {}
-            from System import Exception as dotNetException  # type: ignore
-
-            for i, server in enumerate(AF.PI.PIServers(), start=1):
-                try:
-                    self._servers[server.Name] = server
-                except Exception:
-                    failures += 1
-                except dotNetException:
-                    failures += 1
-            if failures:
-                warn(
-                    "Could not load {} PI Server(s) out of {}".format(
-                        failures, i
-                    ),
-                    ResourceWarning,
-                )
-        return self._servers
-
-    @classproperty
-    def default_server(self):
-        if self._default_server is _NOTHING:
-            self._default_server = None
-            try:
-                self._default_server = AF.PI.PIServers().DefaultPIServer
-            except Exception:
-                warn("Could not load the default PI Server", ResourceWarning)
-        return self._default_server
-
+	
     def __enter__(self):
         if self._credentials:
             self.connection.Connect(*self._credentials)
@@ -230,7 +191,7 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
             [
                 Tag(pi_point)
                 for pi_point in AF.PI.PIPoint.FindPIPoints(
-                    self.connection, BuiltinStr(query), source, None
+                    self.connection, str(query), source, None
                 )
             ]
         )
