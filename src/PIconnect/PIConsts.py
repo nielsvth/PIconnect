@@ -1,6 +1,5 @@
-from PIconnect.AFSDK import AF
+from PIconnect.AFSDK import AF, clr
 
-import clr
 # depending on version of pythonnet, change class inheritance
 if int(clr.__version__.split('.')[0]) >= 3:
     x = object
