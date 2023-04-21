@@ -23,6 +23,7 @@ General set-up instructions:
 .. code-block:: console
     
     >> conda create --name <ENVIRONMENT NAME> --no-default-package
+    >> conda activate <ENVIRONMENT NAME> 
     >> pip install git+https://github.com/nielsvth/PIconnect.git
     
 **Attention:** 
@@ -37,6 +38,7 @@ When using **Spyder IDE**, use following instructions for set-up:
 .. code-block:: console
     
     >> conda create --name <ENVIRONMENT NAME> pythonnet==2.5.1 --no-default-package
+    >> conda activate <ENVIRONMENT NAME> 
     >> pip install git+https://github.com/nielsvth/PIconnect.git
 
 Tutorial
