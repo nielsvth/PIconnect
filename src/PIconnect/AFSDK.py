@@ -33,7 +33,12 @@ if (
     or os.getenv("READTHEDOCS", "false").lower() == "true"
 ):
     _af, _System, _AF_SDK_version = __fallback()
+
 else:
+    # https://pypi.org/project/pythonnet/
+    # from pythonnet import unload
+    # unload()
+
     import clr as _clr
 
     # Get the installation directory from the environment variable or fall back

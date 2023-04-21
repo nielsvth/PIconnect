@@ -1,11 +1,12 @@
 from PIconnect.AFSDK import AF, clr
 
 # depending on version of pythonnet, change class inheritance
-if int(clr.__version__.split('.')[0]) >= 3:
+if int(clr.__version__.split(".")[0]) >= 3:
     x = object
     y = object
 else:
     import enum
+
     x = enum.IntEnum
     y = enum.IntFlag
 
@@ -259,7 +260,7 @@ class EventFrameSearchMode(x):
     ForwardInProgress = AF.EventFrame.AFEventFrameSearchMode.ForwardInProgress
 
 
-class SearchMode (x):
+class SearchMode(x):
     """AF.Asset.AFSearchMode
     https://docs.aveva.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFSearchMode.htm
     """
