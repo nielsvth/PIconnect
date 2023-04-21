@@ -32,8 +32,7 @@ It is good practice to create a new environment for each project.
 * Pythonnet >= 3.0 is not compatible with Python <= 3.6
 * Pythonnet <= 2.5 is not compatible with Python >= 3.9
 
-When using **Spyder IDE**, use following instructions for set-up:
-
+For compatibility with **Spyder IDE**, use following instructions for set-up:
 
 .. code-block:: console
     
