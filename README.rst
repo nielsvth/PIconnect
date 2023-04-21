@@ -41,7 +41,7 @@ When using **Spyder IDE**, use following instructions for set-up:
     >> conda activate <ENVIRONMENT NAME> 
     >> pip install git+https://github.com/nielsvth/PIconnect.git
 
-To verifiy your installation use:
+To verifiy your installation:
 
 .. code-block:: console
     
