@@ -18,7 +18,7 @@ Installation
 
 It is good practice to create a new environment for each project.
 
-General set-up instructions:
+**General set-up** instructions:
 
 .. code-block:: console
     
@@ -40,6 +40,15 @@ When using **Spyder IDE**, use following instructions for set-up:
     >> conda create --name <ENVIRONMENT NAME> pythonnet==2.5.1 --no-default-package
     >> conda activate <ENVIRONMENT NAME> 
     >> pip install git+https://github.com/nielsvth/PIconnect.git
+
+To verifiy your installation use:
+
+.. code-block:: console
+    
+    >> conda activate <ENVIRONMENT NAME> 
+    >> pip show PIconnect
+
+Make sure you are working with the *'nielsvth/PIconnect'* package 
 
 Tutorial
 ========================================================
