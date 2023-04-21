@@ -40,6 +40,8 @@ For compatibility with **Spyder IDE**, use following instructions for set-up:
     >> conda activate <ENVIRONMENT NAME> 
     >> pip install git+https://github.com/nielsvth/PIconnect.git
 
+*Spyder 5.1.5* is recommended for harnessing the full capability of the variable explorer
+
 To verifiy your installation:
 
 .. code-block:: console
