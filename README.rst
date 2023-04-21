@@ -13,6 +13,34 @@ The basic introduction to working with the PIconnect package is covered in the T
 
 * Free software: MIT license
 
+Installation
+========================================================
+
+It is good practice to create a new environment for each project.
+
+General set-up instructions:
+
+.. code-block:: console
+    
+    >> conda create --name <ENVIRONMENT NAME> --no-default-package
+    >> conda activate <ENVIRONMENT NAME> 
+    >> pip install git+https://github.com/nielsvth/PIconnect.git
+    
+**Attention:** 
+
+* Pythonnet >= 3.0 is currently not compatible with the Spyder IDE
+* Pythonnet >= 3.0 is not compatible with Python <= 3.6
+* Pythonnet <= 2.5 is not compatible with Python >= 3.9
+
+When using **Spyder IDE**, use following instructions for set-up:
+
+
+.. code-block:: console
+    
+    >> conda create --name <ENVIRONMENT NAME> pythonnet==2.5.1 --no-default-package
+    >> conda activate <ENVIRONMENT NAME> 
+    >> pip install git+https://github.com/nielsvth/PIconnect.git
+
 Tutorial
 ========================================================
 
