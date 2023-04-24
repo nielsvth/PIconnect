@@ -37,6 +37,7 @@ import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
 _NOTHING = object()
 
+
 def _lookup_servers() -> Dict[str, AF.PI.PIServer]:
     servers: Dict[str, AF.PI.PIServer] = {}
 
@@ -59,6 +60,7 @@ def _lookup_default_server() -> Optional[AF.PI.PIServer]:
     except Exception:
         warn("Could not load the default PI Server", ResourceWarning)
     return default_server
+
 
 class PIServer(object):  # pylint: disable=useless-object-inheritance
     """PIServer is a connection to an OSIsoft PI Server
@@ -133,7 +135,7 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
             self.connection.ConnectionInfo.OperationTimeOut = System.TimeSpan(
                 0, 0, timeout
             )
-	
+
     def __enter__(self):
         if self._credentials:
             self.connection.Connect(*self._credentials)
@@ -310,7 +312,7 @@ class Tag:
     @property
     def pointtype_desc(self):
         """Return the pointtype"""
-        return self.tag.pointtype.ToString()
+        return self.tag.PointType.ToString()
 
     # Methods
     def current_value(self) -> int:
@@ -478,7 +480,7 @@ class Tag:
         # summary
         df_final = pd.DataFrame()
         for x in result:  # per summary
-            summary = x.ToString().replace('[','').split(',')[0]
+            summary = x.ToString().replace("[", "").split(",")[0]
             value = x.Value
             timestamp = timestamp_to_index(x.Value.Timestamp.UtcTime)
             df = pd.DataFrame(
@@ -501,7 +503,7 @@ class Tag:
         # summaries
         df_final = pd.DataFrame()
         for x in result:  # per summary
-            summary = x.ToString().replace('[','').split(',')[0]
+            summary = x.ToString().replace("[", "").split(",")[0]
             values = [
                 (timestamp_to_index(value.Timestamp.UtcTime), value.Value)
                 for value in x.Value
@@ -1024,7 +1026,9 @@ class TagList(UserList):
             df_final = pd.DataFrame()
             for x in data:  # per tag
                 point = [y.PIPoint.Name for y in x.Values][0]
-                summaries = [y.ToString().replace('[','').split(',')[0] for y in x]
+                summaries = [
+                    y.ToString().replace("[", "").split(",")[0] for y in x
+                ]
                 values = [
                     [y.Value, timestamp_to_index(y.Timestamp.UtcTime)]
                     for y in x.Values
@@ -1124,9 +1128,9 @@ class TagList(UserList):
                     ]
                 )
                 df["Summary"] = df["Summary"].replace(
-                    [y for y in x.Keys], 
-                    [y.ToString().replace('[','').split(',')[0] for y in x]
-                    )
+                    [y for y in x.Keys],
+                    [y.ToString().replace("[", "").split(",")[0] for y in x],
+                )
                 df = df.explode("Timestamp")
                 df[["Timestamp", "Value"]] = df["Timestamp"].apply(
                     pd.Series
@@ -1236,8 +1240,8 @@ class TagList(UserList):
                     ]
                 )
                 df["Summary"] = df["Summary"].replace(
-                    [y for y in x.Keys], 
-                    [y.ToString().replace('[','').split(',')[0] for y in x]
+                    [y for y in x.Keys],
+                    [y.ToString().replace("[", "").split(",")[0] for y in x],
                 )
                 df = df.explode("Timestamp")
                 df[["Timestamp", "Value"]] = df["Timestamp"].apply(
