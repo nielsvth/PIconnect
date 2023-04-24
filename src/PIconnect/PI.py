@@ -200,6 +200,24 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
             return result
         else:
             raise AttributeError(f"No tags were found for query: {query}")
+    
+    def search(self, query: Union[str, List[str]], source: str = None):
+        """Wrapper for the find_tags method to maintain functionality.
+
+        Search PIPoints on the PIServer
+
+        Args:
+            query (Union[str,List[str]]): String or list of strings with
+                queries
+            source (str, optional): Point source to limit the results.
+                Defaults to None.
+        """
+        warn(
+            "Warning! This method is deprecated and may be removed in future"
+            " versions of PIconnect. Please migrate to PIServer.find_tags()",
+            DeprecationWarning
+        )
+        return self.find_tags(query=query, source=source)
 
     def tag_overview(self, query: str) -> pd.DataFrame:
         """Returns dataframe containing overview for each tag that meets the

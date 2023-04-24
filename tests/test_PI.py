@@ -26,6 +26,19 @@ def test_find_tags(af_connect):
         tag.description == "12 Hour Sine Wave"
     ), "tag description should be '12 Hour Sine Wave'"
 
+def test_search(af_connect):
+    """Test to find Tags on AFDatabase"""
+    # Use default PIserver
+    # SINUSOID is a default tag available on any PIServer
+    server = af_connect[1]
+    taglist = server.search("SINUSOID")
+    assert len(taglist) == 1, "Should be 1"
+    tag = taglist[0]
+    assert tag.name == "SINUSOID", "should be 'SINUSOID'"
+    assert len(tag.raw_attributes) == 58, "should be 58"
+    assert (
+        tag.description == "12 Hour Sine Wave"
+    ), "tag description should be '12 Hour Sine Wave'"
 
 def test_tags(af_connect, pi_timerange):
     """Test functionalty of the Tag/Pipoint class"""
