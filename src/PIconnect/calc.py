@@ -174,7 +174,7 @@ def calc_summary(
 
     df_final = pd.DataFrame()
     for x in result:  # per summary
-        summary = x.Key
+        summary = x.ToString().replace("[", "").split(",")[0]
         values = [
             (timestamp_to_index(value.Timestamp.UtcTime), value.Value)
             for value in x.Value
