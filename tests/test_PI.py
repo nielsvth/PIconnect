@@ -51,7 +51,7 @@ def test_tags(af_connect, pi_timerange):
 
     # interpolated value
     assert (
-        type(tag.interpolated_value(time=starttime)[0]) == datetime.datetime
+        isinstance(tag.interpolated_value(time=starttime)[0], datetime.datetime)
     ), "type should be datetime.datetime"
     assert (
         round(tag.interpolated_value(time=starttime)[1], 2) == 49.45
@@ -90,7 +90,7 @@ def test_tags(af_connect, pi_timerange):
                 starttime=starttime,
                 endtime=starttime,
                 filter_expression="'%tag%' > 30",
-            )["SINUSOID"].min(),
+            ).min(),
             2,
         )
         == 49.45
@@ -186,8 +186,8 @@ def test_taglist(af_connect, pi_timerange):
 
     # interpolated value
     assert (
-        type(taglist.interpolated_value(time="1-1-2022")) == pd.DataFrame
-    ), "Output is of type dataframe"
+        isinstance(taglist.interpolated_value(time="1-1-2022"), pd.DataFrame)
+    ), "Output should be pd.Series"
 
     # interpolated values
     assert taglist.interpolated_values(

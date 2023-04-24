@@ -81,16 +81,16 @@ def test_attribute_extracts(af_connect, af_timerange):
     result = attribute_tag.interpolated_values(
         starttime=starttime, endtime=endtime, interval="1h"
     )
-    assert type(result) == pd.DataFrame, "Output type should be pd.DataFrame"
-    assert result.shape == (73, 1), "Shape should be (73,1)"
+    assert isinstance(result, pd.Series), "Output type should be pd.Series"
+    assert result.shape == (73,), "Shape should be (73,)"
 
     # Attribute is Formula
     result = asset.attributes[-8].current_value()
-    assert type(result) == float, "Output type should be a float"
+    assert isinstance(result, float), "Output type should be a float"
 
     # Attribute is a Table lookup
     assert (
-        type(asset.attributes[-11].current_value()) == datetime.datetime
+        isinstance(asset.attributes[-11].current_value(), datetime.datetime)
     ), "Output type should be datetime.datetime"
 
 

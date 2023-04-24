@@ -356,6 +356,27 @@ class Tag:
             ),
             self.tag.InterpolatedValue(aftime).Value,
         )
+    
+    def _AF_to_Series(self, result: AF.PI.PIPointList) -> pd.Series:
+        """Take in data from the AF methods used below and convert to a Series
+
+        Args:
+            result (AF.PI.PIPointList): Data to convert
+
+        Returns:
+            pd.Series: outgoing series
+        """
+        ser = pd.Series()
+        if result: # In the case of no data
+            # process query results
+            data = list(result)
+            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
+            valDict = {x.Timestamp.UtcTime: x.Value for x in data}
+            ser = pd.Series(valDict)
+            ser.index.name = "Index"
+            ser.name = self.name
+
+        return ser      
 
     def interpolated_values(
         self,
@@ -363,7 +384,7 @@ class Tag:
         endtime: Union[str, datetime.datetime],
         interval: str,
         filter_expression: str = "",
-    ) -> pd.DataFrame:
+    ) -> pd.Series:
         """Retrieve interpolated data across a time range and specified
         interval using optional expression.
 
@@ -375,7 +396,7 @@ class Tag:
                 Defaults to "".
 
         Returns:
-            pd.DataFrame: resulting dataframe
+            pd.Series: resulting Series
         """
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         AFTimeRange = to_af_time_range(starttime, endtime)
@@ -388,20 +409,9 @@ class Tag:
             AFTimeRange, AFInterval, filter_expression, False
         )
 
-        if result:
-            # process query results
-            data = [list(result)]
-            df = pd.DataFrame(data).T
-            df.columns = [self.name]
-            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
-            df.index = df[df.columns[0]].apply(
-                lambda x: timestamp_to_index(x.Timestamp.UtcTime)
-            )
-            df.index.name = "Index"
-            df = df.applymap(lambda x: x.Value)
-            return df
-        else:  # if no result, return empty dataframe
-            return pd.DataFrame()
+        ser = self._AF_to_Series(result)
+        
+        return ser
 
     def recorded_values(
         self,
@@ -409,7 +419,7 @@ class Tag:
         endtime: Union[str, datetime.datetime],
         filter_expression: str = "",
         AFBoundaryType=BoundaryType.Interpolated,
-    ) -> pd.DataFrame:
+    ) -> pd.Series:
         """Retrieve recorded data across a time range and specified
         using optional expression.
 
@@ -436,28 +446,16 @@ class Tag:
             AFTimeRange, AFBoundaryType, filter_expression, False
         )
 
-        if result:
-            # process query results
-            data = [list(result)]
-            df = pd.DataFrame(data).T
-            df.columns = [self.name]
-            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm # noqa
-            df.index = df[df.columns[0]].apply(
-                lambda x: timestamp_to_index(x.Timestamp.UtcTime)
-            )
-            df.index.name = "Index"
-            df = df.applymap(lambda x: x.Value)
-        else:  # if no result, return empty dataframe
-            df = pd.DataFrame()
-
-        return df
+        ser = self._AF_to_Series(result)
+        
+        return ser
 
     def plot_values(
         self,
         starttime: Union[str, datetime.datetime],
         endtime: Union[str, datetime.datetime],
         nr_of_intervals: int,
-    ) -> pd.DataFrame:
+    ) -> pd.Series:
         """Retrieves values over the specified time range suitable for
         plotting over the number of intervals (typically represents pixels).
         Each interval can produce up to 5 values if they are unique, the first
@@ -478,20 +476,9 @@ class Tag:
 
         result = self.tag.PlotValues(AFTimeRange, nr_of_intervals)
 
-        if result:
-            # process query results
-            data = [list(result)]
-            df = pd.DataFrame(data).T
-            df.columns = [self.name]
-            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm # noqa
-            df.index = df[df.columns[0]].apply(
-                lambda x: timestamp_to_index(x.Timestamp.UtcTime)
-            )
-            df.index.name = "Index"
-            df = df.applymap(lambda x: x.Value)
-        else:
-            df = pd.DataFrame()
-        return df
+        ser = self._AF_to_Series(result)
+        
+        return ser
 
     def _parseSummaryResult(self, result) -> pd.DataFrame:
         """Parse a Summary result and return a dataframe.
