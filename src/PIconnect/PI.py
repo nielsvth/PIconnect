@@ -484,7 +484,7 @@ class Tag:
         df_final = pd.DataFrame()
         for x in result:  # per summary
             summary = x.ToString().replace("[", "").split(",")[0]
-            value = x.Value
+            value = x.Value.Value
             timestamp = timestamp_to_index(x.Value.Timestamp.UtcTime)
             df = pd.DataFrame(
                 [[summary, value, timestamp]],
