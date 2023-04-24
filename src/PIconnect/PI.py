@@ -312,7 +312,10 @@ class Tag:
     @property
     def pointtype_desc(self):
         """Return the pointtype"""
-        return self.tag.PointType.ToString()
+        try:
+            return self.tag.PointType.ToString()
+        except:
+            return str(PIPointType(self.tag.PointType)).split('.')[-1]
 
     # Methods
     def current_value(self) -> int:
