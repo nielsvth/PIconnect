@@ -49,6 +49,13 @@ To verifiy your installation:
 
 Make sure you are working with the *'nielsvth/PIconnect'* package 
 
+To update package:
+
+.. code-block:: console
+
+    >> pip install git+https://github.com/nielsvth/PIconnect.git --upgrade
+
+
 Tutorial
 ========================================================
 
