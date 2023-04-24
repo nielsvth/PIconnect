@@ -33,6 +33,7 @@ from PIconnect.AFSDK import System
 from collections import UserList
 
 import pandas as pd
+from typing import Tuple
 
 pd.options.mode.chained_assignment = None  # default='warn'
 _NOTHING = object()
@@ -200,7 +201,7 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
             return result
         else:
             raise AttributeError(f"No tags were found for query: {query}")
-    
+
     def search(self, query: Union[str, List[str]], source: str = None):
         """Wrapper for the find_tags method to maintain functionality.
 
@@ -215,7 +216,7 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
         warn(
             "Warning! This method is deprecated and may be removed in future"
             " versions of PIconnect. Please migrate to PIServer.find_tags()",
-            DeprecationWarning
+            DeprecationWarning,
         )
         return self.find_tags(query=query, source=source)
 
@@ -270,7 +271,8 @@ class Tag:
     def validate(tag):
         if not isinstance(tag, AF.PI.PIPoint):
             raise AttributeError(
-                "This type of input is not a Tag object, use the 'find_tags' function of the PIServer class to find tag objects"
+                "This type of input is not a Tag object, use the 'find_tags'"
+                " function of the PIServer class to find tag objects"
             )
 
     def __load_attributes(self):
@@ -333,7 +335,7 @@ class Tag:
         try:
             return self.tag.PointType.ToString()
         except:
-            return str(PIPointType(self.tag.PointType)).split('.')[-1]
+            return str(PIPointType(self.tag.PointType)).split(".")[-1]
 
     # Methods
     def current_value(self) -> int:
@@ -343,8 +345,10 @@ class Tag:
             self.tag.CurrentValue().Value,
         )
 
-    def interpolated_value(self, time: Union[str, datetime.datetime]) -> int:
-        """Return tuple of specified time and interpolated value at specified time"""
+    def interpolated_value(
+        self, time: Union[str, datetime.datetime]
+    ) -> Tuple[datetime.datetime, float]:
+        """Return tuple of specified time and interpolated value"""
         aftime = to_af_time(time)
         return (
             timestamp_to_index(
