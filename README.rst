@@ -55,7 +55,7 @@ To update package:
 
 .. code-block:: console
 
-    >> pip install git+https://github.com/nielsvth/PIconnect.git --upgrade
+    >> pip install --upgrade git+https://github.com/nielsvth/PIconnect.git
 
 
 Tutorial
