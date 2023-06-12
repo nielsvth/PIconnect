@@ -980,7 +980,7 @@ Threading is currently available for:
    :widths: 30, 15, 50  
    
    "**.ahy.add_attributes**
-   (attribute_names_list, level)", "*Method*", "Add attributtes to AssetHierarchy for specified attributes and level"
+   (attribute_names_list, template_name)", "*Method*", "Add attributtes to AssetHierarchy for specified attributes and level"
    "**.ahy.condense**
    ()", "*Method*", "Condense the AssetHierarchy object to return a condensed, vertically layered representation of the Asset Tree"
 
