@@ -26,6 +26,19 @@ def test_find_tags(af_connect):
         tag.description == "12 Hour Sine Wave"
     ), "tag description should be '12 Hour Sine Wave'"
 
+def test_search(af_connect):
+    """Test to find Tags on AFDatabase"""
+    # Use default PIserver
+    # SINUSOID is a default tag available on any PIServer
+    server = af_connect[1]
+    taglist = server.search("SINUSOID")
+    assert len(taglist) == 1, "Should be 1"
+    tag = taglist[0]
+    assert tag.name == "SINUSOID", "should be 'SINUSOID'"
+    assert len(tag.raw_attributes) == 58, "should be 58"
+    assert (
+        tag.description == "12 Hour Sine Wave"
+    ), "tag description should be '12 Hour Sine Wave'"
 
 def test_tags(af_connect, pi_timerange):
     """Test functionalty of the Tag/Pipoint class"""
@@ -38,7 +51,7 @@ def test_tags(af_connect, pi_timerange):
 
     # interpolated value
     assert (
-        type(tag.interpolated_value(time=starttime)[0]) == datetime.datetime
+        isinstance(tag.interpolated_value(time=starttime)[0], datetime.datetime)
     ), "type should be datetime.datetime"
     assert (
         round(tag.interpolated_value(time=starttime)[1], 2) == 49.45
@@ -77,7 +90,7 @@ def test_tags(af_connect, pi_timerange):
                 starttime=starttime,
                 endtime=starttime,
                 filter_expression="'%tag%' > 30",
-            )["SINUSOID"].min(),
+            ).min(),
             2,
         )
         == 49.45
@@ -173,8 +186,8 @@ def test_taglist(af_connect, pi_timerange):
 
     # interpolated value
     assert (
-        type(taglist.interpolated_value(time="1-1-2022")) == pd.DataFrame
-    ), "Output is of type dataframe"
+        isinstance(taglist.interpolated_value(time="1-1-2022"), pd.DataFrame)
+    ), "Output should be pd.Series"
 
     # interpolated values
     assert taglist.interpolated_values(

@@ -33,6 +33,7 @@ from PIconnect.AFSDK import System
 from collections import UserList
 
 import pandas as pd
+from typing import Tuple
 
 pd.options.mode.chained_assignment = None  # default='warn'
 _NOTHING = object()
@@ -201,6 +202,24 @@ class PIServer(object):  # pylint: disable=useless-object-inheritance
         else:
             raise AttributeError(f"No tags were found for query: {query}")
 
+    def search(self, query: Union[str, List[str]], source: str = None):
+        """Wrapper for the find_tags method to maintain functionality.
+
+        Search PIPoints on the PIServer
+
+        Args:
+            query (Union[str,List[str]]): String or list of strings with
+                queries
+            source (str, optional): Point source to limit the results.
+                Defaults to None.
+        """
+        warn(
+            "Warning! This method is deprecated and may be removed in future"
+            " versions of PIconnect. Please migrate to PIServer.find_tags()",
+            DeprecationWarning,
+        )
+        return self.find_tags(query=query, source=source)
+
     def tag_overview(self, query: str) -> pd.DataFrame:
         """Returns dataframe containing overview for each tag that meets the
         restrictions specified in the query
@@ -252,7 +271,8 @@ class Tag:
     def validate(tag):
         if not isinstance(tag, AF.PI.PIPoint):
             raise AttributeError(
-                "This type of input is not a Tag object, use the 'find_tags' function of the PIServer class to find tag objects"
+                "This type of input is not a Tag object, use the 'find_tags'"
+                " function of the PIServer class to find tag objects"
             )
 
     def __load_attributes(self):
@@ -315,7 +335,7 @@ class Tag:
         try:
             return self.tag.PointType.ToString()
         except:
-            return str(PIPointType(self.tag.PointType)).split('.')[-1]
+            return str(PIPointType(self.tag.PointType)).split(".")[-1]
 
     # Methods
     def current_value(self) -> int:
@@ -325,8 +345,10 @@ class Tag:
             self.tag.CurrentValue().Value,
         )
 
-    def interpolated_value(self, time: Union[str, datetime.datetime]) -> int:
-        """Return tuple of specified time and interpolated value at specified time"""
+    def interpolated_value(
+        self, time: Union[str, datetime.datetime]
+    ) -> Tuple[datetime.datetime, float]:
+        """Return tuple of specified time and interpolated value"""
         aftime = to_af_time(time)
         return (
             timestamp_to_index(
@@ -335,13 +357,34 @@ class Tag:
             self.tag.InterpolatedValue(aftime).Value,
         )
 
+    def _AF_to_Series(self, result: AF.PI.PIPointList) -> pd.Series:
+        """Take in data from the AF methods used below and convert to a Series
+
+        Args:
+            result (AF.PI.PIPointList): Data to convert
+
+        Returns:
+            pd.Series: outgoing series
+        """
+        ser = pd.Series(dtype="float64")
+        if result:  # In the case of no data
+            # process query results
+            data = list(result)
+            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
+            valDict = {x.Timestamp.UtcTime: x.Value for x in data}
+            ser = pd.Series(valDict)
+            ser.index.name = "Index"
+            ser.name = self.name
+
+        return ser
+
     def interpolated_values(
         self,
         starttime: Union[str, datetime.datetime],
         endtime: Union[str, datetime.datetime],
         interval: str,
         filter_expression: str = "",
-    ) -> pd.DataFrame:
+    ) -> pd.Series:
         """Retrieve interpolated data across a time range and specified
         interval using optional expression.
 
@@ -353,7 +396,7 @@ class Tag:
                 Defaults to "".
 
         Returns:
-            pd.DataFrame: resulting dataframe
+            pd.Series: resulting Series
         """
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         AFTimeRange = to_af_time_range(starttime, endtime)
@@ -366,20 +409,9 @@ class Tag:
             AFTimeRange, AFInterval, filter_expression, False
         )
 
-        if result:
-            # process query results
-            data = [list(result)]
-            df = pd.DataFrame(data).T
-            df.columns = [self.name]
-            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
-            df.index = df[df.columns[0]].apply(
-                lambda x: timestamp_to_index(x.Timestamp.UtcTime)
-            )
-            df.index.name = "Index"
-            df = df.applymap(lambda x: x.Value)
-            return df
-        else:  # if no result, return empty dataframe
-            return pd.DataFrame()
+        ser = self._AF_to_Series(result)
+
+        return ser
 
     def recorded_values(
         self,
@@ -387,7 +419,7 @@ class Tag:
         endtime: Union[str, datetime.datetime],
         filter_expression: str = "",
         AFBoundaryType=BoundaryType.Interpolated,
-    ) -> pd.DataFrame:
+    ) -> pd.Series:
         """Retrieve recorded data across a time range and specified
         using optional expression.
 
@@ -414,28 +446,16 @@ class Tag:
             AFTimeRange, AFBoundaryType, filter_expression, False
         )
 
-        if result:
-            # process query results
-            data = [list(result)]
-            df = pd.DataFrame(data).T
-            df.columns = [self.name]
-            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm # noqa
-            df.index = df[df.columns[0]].apply(
-                lambda x: timestamp_to_index(x.Timestamp.UtcTime)
-            )
-            df.index.name = "Index"
-            df = df.applymap(lambda x: x.Value)
-        else:  # if no result, return empty dataframe
-            df = pd.DataFrame()
+        ser = self._AF_to_Series(result)
 
-        return df
+        return ser
 
     def plot_values(
         self,
         starttime: Union[str, datetime.datetime],
         endtime: Union[str, datetime.datetime],
         nr_of_intervals: int,
-    ) -> pd.DataFrame:
+    ) -> pd.Series:
         """Retrieves values over the specified time range suitable for
         plotting over the number of intervals (typically represents pixels).
         Each interval can produce up to 5 values if they are unique, the first
@@ -456,20 +476,9 @@ class Tag:
 
         result = self.tag.PlotValues(AFTimeRange, nr_of_intervals)
 
-        if result:
-            # process query results
-            data = [list(result)]
-            df = pd.DataFrame(data).T
-            df.columns = [self.name]
-            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm # noqa
-            df.index = df[df.columns[0]].apply(
-                lambda x: timestamp_to_index(x.Timestamp.UtcTime)
-            )
-            df.index.name = "Index"
-            df = df.applymap(lambda x: x.Value)
-        else:
-            df = pd.DataFrame()
-        return df
+        ser = self._AF_to_Series(result)
+
+        return ser
 
     def _parseSummaryResult(self, result) -> pd.DataFrame:
         """Parse a Summary result and return a dataframe.
@@ -748,6 +757,28 @@ class TagList(UserList):
                     + f"{type(tag)} to TagList object"
                 )
 
+    def _innerFunc_resultToDF(self, result) -> pd.DataFrame:
+        """Inner function to get a dataframe from a result to avoid
+        code duplication. Used in current_value and interpolated_value.
+
+        Args:
+            result: result from functions
+
+        Returns:
+            pd.DataFrame: results
+        """
+        if result:
+            out = pd.DataFrame(
+                data={x.PIPoint.Name: [x.Value] for x in result},
+                index = pd.Index(
+                    [timestamp_to_index(result[0].Timestamp.UtcTime)],
+                    name="Index"
+                )
+            )
+        else:
+            out = pd.DataFrame()
+        return out
+    
     def current_value(self) -> pd.DataFrame:
         """Getter method for current values of all tags in list
 
@@ -756,16 +787,8 @@ class TagList(UserList):
         """
         PIPointlist = generate_pipointlist(self)
         result = PIPointlist.CurrentValue()
-        if result:
-            values = [x.Value for x in result]
-            tags = [x.PIPoint.Name for x in result]
-            out = pd.DataFrame(
-                [values],
-                columns=tags,
-                index=[timestamp_to_index(result[0].Timestamp.UtcTime)],
-            )
-        else:
-            out = pd.DataFrame()
+        
+        out = self._innerFunc_resultToDF(result)
         return out
 
     def interpolated_value(
@@ -779,19 +802,39 @@ class TagList(UserList):
         PIPointlist = generate_pipointlist(self)
         aftime = to_af_time(time)
         result = PIPointlist.InterpolatedValue(aftime)
-        if result:
-            values = [x.Value for x in result]
-            tags = [x.PIPoint.Name for x in result]
-            out = pd.DataFrame(
-                [values],
-                columns=tags,
-                index=[timestamp_to_index(aftime.UtcTime)],
-            )
-        else:
-            out = pd.DataFrame()
+        out = self._innerFunc_resultToDF(result)
         return out
 
-    # TODO: convert this to simply calling Tag.plot_values() if possible
+    def _innerFunc_resultToDict(self,result) -> Dict[str, pd.DataFrame]:
+        """Inner function for the plot_values and recorded_values functions
+        to avoid duplication of code
+
+        Args:
+            result: Result passed to function
+
+        Returns:
+            Dict[str, pd.DataFrame]: Dictionary of results
+        """
+        out = {}
+        if result:
+            PointList = result.GetEnumerator()
+            out = {
+                p.PIPoint.Name: pd.DataFrame(
+                    data=[x.Value for x in p],
+                    columns=["Data"],
+                    index=pd.Index(
+                        data=[
+                            timestamp_to_index(x.Timestamp.UtcTime)
+                            for x in p
+                        ],
+                        name="Index",
+                    ),
+                )
+                for p in PointList
+            }
+        return out
+
+
     def plot_values(
         self,
         starttime: Union[str, datetime.datetime],
@@ -823,28 +866,8 @@ class TagList(UserList):
             nr_of_intervals,
             paging_config,
         )
-
-        if result:
-            # process query results
-            data1 = [x for x in result.GetEnumerator()]
-            PointList = [point.PIPoint for point in data1]
-            data2 = [list(series) for series in data1]
-
-            dct = {}
-            tags = [tag.Name for tag in PointList]
-            for i, lst in enumerate(data2):
-                df = pd.DataFrame([lst]).T
-                df.columns = ["Data"]
-                # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
-                df.index = df["Data"].apply(
-                    lambda x: timestamp_to_index(x.Timestamp.UtcTime)
-                )
-                df.index.name = "Index"
-                df = df.applymap(lambda x: x.Value)
-                dct[tags[i]] = df
-            return dct
-        else:
-            return dict()
+        out = self._innerFunc_resultToDict(result)
+        return out
 
     # TODO: pass to underlying Tag function
     def interpolated_values(
@@ -874,7 +897,8 @@ class TagList(UserList):
         AFInterval = AF.Time.AFTimeSpan.Parse(interval)
         AFTimeRange = to_af_time_range(starttime, endtime)
 
-        # Could have issues with quering multiple PI Data Archives simultanously, see documentation
+        # Could have issues with quering multiple PI Data Archives
+        # simultanously, see documentation
         # https://docs.osisoft.com/bundle/af-sdk/page/html/M_OSIsoft_AF_PI_PIPointList_InterpolatedValues.htm # noqa
         result = PIPointlist.InterpolatedValues(
             AFTimeRange,
@@ -883,25 +907,26 @@ class TagList(UserList):
             False,
             paging_config,
         )
+        df = pd.DataFrame()
+        if result:  # In the case of no data
+            # convert to list so we can access point[0]
+            PointList = list(result.GetEnumerator())
+            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm
+            valDict = {
+                p.PIPoint.Name: [x.Value for x in p] for p in PointList
+            }
+            df = pd.DataFrame(
+                data=valDict,
+                index=pd.Index(
+                    data=[
+                        timestamp_to_index(x.Timestamp.UtcTime)
+                        for x in PointList[0]
+                        ],
+                    name="Index"
+                    )
+                )
+        return df
 
-        if result:
-            # process query results
-            data1 = [x for x in result.GetEnumerator()]
-            PointList = [point.PIPoint for point in data1]
-            data2 = [list(series) for series in data1]
-            df = pd.DataFrame(data2).T
-            df.columns = [tag.Name for tag in PointList]
-            # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm # noqa
-            df.index = df[df.columns[0]].apply(
-                lambda x: timestamp_to_index(x.Timestamp.UtcTime)
-            )
-            df.index.name = "Index"
-            df = df.applymap(lambda x: x.Value)
-            return df
-        else:  # if no result, return empty dataframe
-            return pd.DataFrame()
-
-    # TODO: pass to underlying tag function
     # TODO: should default BoundaryType be INSIDE ?
     def recorded_values(
         self,
@@ -942,27 +967,8 @@ class TagList(UserList):
             paging_config,
         )
 
-        if result:
-            # process query results
-            data1 = [x for x in result.GetEnumerator()]
-            PointList = [point.PIPoint for point in data1]
-            data2 = [list(series) for series in data1]
-
-            dct = {}
-            tags = [tag.Name for tag in PointList]
-            for i, lst in enumerate(data2):
-                df = pd.DataFrame([lst]).T
-                df.columns = ["Data"]
-                # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm # noqa
-                df.index = df["Data"].apply(
-                    lambda x: timestamp_to_index(x.Timestamp.UtcTime)
-                )
-                df.index.name = "Index"
-                df = df.applymap(lambda x: x.Value)
-                dct[tags[i]] = df
-            return dct
-        else:  # if no result, return empty dictionary
-            return dict()
+        out = self._innerFunc_resultToDict(result)
+        return out
 
     # TODO: pass to underlying Tag function
     def summary(
