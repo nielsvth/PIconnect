@@ -42,6 +42,12 @@ For compatibility with **Spyder IDE**, use following instructions for set-up:
     >> conda install git
     >> pip install git+https://github.com/nielsvth/PIconnect.git
 
+In case of a 'PackagesNotFoundError' you might have to add the conda-forge channels as such: 
+
+.. code-block:: console
+
+    >> conda config --append channels conda-forge 
+
 To verifiy your installation:
 
 .. code-block:: console
