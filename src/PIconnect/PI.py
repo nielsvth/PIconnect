@@ -890,7 +890,10 @@ class TagList(UserList):
             PointList = [point.PIPoint for point in data1]
             data2 = [list(series) for series in data1]
             df = pd.DataFrame(data2).T
-            df.columns = [tag.Name for tag in PointList]
+            try:
+                df.columns = [tag.Name for tag in PointList]
+            except:
+                df.columns = [tag.name for tag in self] #in case of filtered
             # https://docs.osisoft.com/bundle/af-sdk/page/html/T_OSIsoft_AF_Asset_AFValue.htm # noqa
             df.index = df[df.columns[0]].apply(
                 lambda x: timestamp_to_index(x.Timestamp.UtcTime)
