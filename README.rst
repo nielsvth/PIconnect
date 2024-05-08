@@ -946,7 +946,7 @@ Threading is currently available for:
    (tag_list, nr_of_intervals, dataserver=None)", "*Method*", "Return nested dictionary (level 1: Procedures, Level 2: Tags) of continuous plot values from the start of the first filtered event to the end of the last filtered event for each procedure on bottom level of condensed hierarchy. Each interval can produce up to 5 values if they are unique, the first value in the interval, the last value, the highest value, the lowest value and at most one exceptional point (bad status or digital state)"
    "**.ecd.summary_extract**
    (tag_list, summary_types, dataserver=None, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, col=False)", "*Method*", "Return dataframe of summary values for events on bottom level of condensed hierarchy"
-    "**.ecd.calc_summary_extract** 
+   "**.ecd.calc_summary_extract** 
    (interval, summary_types, expression, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, AFfilter_evaluation=ExpressionSampleType.ExpressionRecordedValues, filter_interval, col=False)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the interval for each event at bottom level of the CondensedHierarchy. Expression argument need to be entered as raw strings: r'expression'."
 
 
@@ -1019,7 +1019,7 @@ Threading is currently available for:
 
    "**PIconnect.calc.calc_recorded**
    (starttime, endtime, expression=r"")", "*Method*", "Returns dataframe that contains the result of evaluating the passed expression at each point in time over the passed time range where a recorded value exists for a member of the expression. Expression argument need to be entered as raw strings: r'expression'"
-    "**PIconnect.calc.calc_interpolated**
+   "**PIconnect.calc.calc_interpolated**
    (starttime, endtime, interval, expression=r"")", "*Method*", "Returns dataframe that contains the result of evaluating the passed expression over the passed time range at a defined interval. Expression argument need to be entered as raw strings: r'expression'."
    "**calc.calc_summary**
    (starttime, endtime, interval, summary_types, expression, calculation_basis=CalculationBasis.TimeWeighted, time_type=TimestampCalculation.Auto, AFfilter_evaluation=ExpressionSampleType.ExpressionRecordedValues, filter_interval)", "*method*", "Returns dataframe of summary measures of calculations specified in expression, for the specified duration and interval. Expression argument need to be entered as raw strings: r'expression'."
