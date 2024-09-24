@@ -40,6 +40,7 @@ For compatibility with **Spyder IDE**, use following instructions for set-up:
     >> conda create --name <ENVIRONMENT NAME> pythonnet==2.5.1 --no-default-package
     >> conda activate <ENVIRONMENT NAME> 
     >> conda install git
+    >> pip install pandas==1.4.4
     >> pip install git+https://github.com/nielsvth/PIconnect.git
 
 In case of a 'PackagesNotFoundError' you might have to add the conda-forge channels as such: 
